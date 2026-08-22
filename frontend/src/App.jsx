@@ -22,7 +22,8 @@ import {
   Moon, 
   Eye, 
   EyeOff,
-  RefreshCw
+  RefreshCw,
+  Info
 } from 'lucide-react';
 
 import FONDO from './assets/FONDO.jpg.avif';
@@ -47,69 +48,77 @@ function PadelLoader({ texto = "Cargando complejo..." }) {
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
       <style>{`
-        @keyframes fillPadel {
-          0% { transform: translateY(85px); }
-          50% { transform: translateY(5px); }
-          100% { transform: translateY(85px); }
+        @keyframes fillUp {
+          0% { height: 0%; y: 100px; }
+          50% { height: 100%; y: 0px; }
+          100% { height: 0%; y: 100px; }
         }
-        @keyframes bounceBall {
-          0% { transform: translateY(0); }
-          100% { transform: translateY(-18px); }
+        @keyframes padelHit {
+          0%, 100% { transform: rotate(-8deg) translateY(0); }
+          50% { transform: rotate(-14deg) translateY(-4px); }
         }
-        .anim-fill {
-          animation: fillPadel 2s infinite ease-in-out;
+        @keyframes ballBounce {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-18px, -28px) scale(0.9); }
         }
-        .anim-ball {
-          animation: bounceBall 0.8s infinite alternate ease-out;
+        .anim-fill-rect {
+          animation: fillUp 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+        }
+        .anim-padel {
+          animation: padelHit 1.2s ease-in-out infinite;
+          transform-origin: 50% 80%;
+        }
+        .anim-ball-bounce {
+          animation: ballBounce 1.2s ease-in-out infinite;
         }
       `}</style>
 
-      <div className="relative w-20 h-20 flex items-center justify-center">
-        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-12 filter drop-shadow-[0_0_12px_rgba(52,211,153,0.35)]">
+      <div className="relative w-28 h-28 flex items-center justify-center">
+        {/* Glow de fondo */}
+        <div className="absolute w-20 h-20 rounded-full bg-emerald-500/20 blur-xl pointer-events-none" />
+
+        <svg viewBox="0 0 100 100" className="w-24 h-24 anim-padel filter drop-shadow-[0_0_14px_rgba(52,211,153,0.4)] overflow-visible">
           <defs>
-            <clipPath id="loader-padel-clip">
-              <rect className="anim-fill" x="0" y="0" width="100" height="100" />
+            <clipPath id="loader-fill-clip">
+              <rect className="anim-fill-rect" x="0" y="0" width="100" height="100" />
             </clipPath>
+
+            <mask id="padel-holes-mask">
+              <rect x="0" y="0" width="100" height="100" fill="white" />
+              {/* Agujeros de la paleta */}
+              <circle cx="43" cy="36" r="2.8" fill="black" />
+              <circle cx="50" cy="36" r="2.8" fill="black" />
+              <circle cx="57" cy="36" r="2.8" fill="black" />
+              <circle cx="39" cy="46" r="2.8" fill="black" />
+              <circle cx="46.5" cy="46" r="2.8" fill="black" />
+              <circle cx="53.5" cy="46" r="2.8" fill="black" />
+              <circle cx="61" cy="46" r="2.8" fill="black" />
+              <circle cx="43" cy="56" r="2.8" fill="black" />
+              <circle cx="50" cy="56" r="2.8" fill="black" />
+              <circle cx="57" cy="56" r="2.8" fill="black" />
+            </mask>
           </defs>
 
-          {/* Silueta de fondo */}
-          <g>
-            <rect x="45" y="66" width="10" height="26" rx="4" fill="#27272a" />
-            <path d="M 50 12 C 28 12, 22 28, 22 45 C 22 62, 38 68, 50 68 C 62 68, 78 62, 78 45 C 78 28, 72 12, 50 12 Z" fill="#18181b" stroke="#3f3f46" strokeWidth="3" />
-            <circle cx="42" cy="33" r="2.5" fill="#09090b" />
-            <circle cx="50" cy="33" r="2.5" fill="#09090b" />
-            <circle cx="58" cy="33" r="2.5" fill="#09090b" />
-            <circle cx="38" cy="43" r="2.5" fill="#09090b" />
-            <circle cx="46" cy="43" r="2.5" fill="#09090b" />
-            <circle cx="54" cy="43" r="2.5" fill="#09090b" />
-            <circle cx="62" cy="43" r="2.5" fill="#09090b" />
-            <circle cx="42" cy="53" r="2.5" fill="#09090b" />
-            <circle cx="50" cy="53" r="2.5" fill="#09090b" />
-            <circle cx="58" cy="53" r="2.5" fill="#09090b" />
+          {/* Silueta base oscura con mango */}
+          <g mask="url(#padel-holes-mask)">
+            {/* Grip / Mango */}
+            <rect x="46" y="68" width="8" height="24" rx="4" fill="#27272a" stroke="#3f3f46" strokeWidth="1.5" />
+            {/* Cabeza de la paleta */}
+            <path d="M 50 14 C 30 14, 25 28, 25 46 C 25 64, 38 70, 50 70 C 62 70, 75 64, 75 46 C 75 28, 70 14, 50 14 Z" fill="#18181b" stroke="#3f3f46" strokeWidth="2" />
           </g>
 
-          {/* Relleno Esmeralda reactivo animado */}
-          <g clipPath="url(#loader-padel-clip)">
-            <rect x="45" y="66" width="10" height="26" rx="4" fill="#34d399" />
-            <path d="M 50 12 C 28 12, 22 28, 22 45 C 22 62, 38 68, 50 68 C 62 68, 78 62, 78 45 C 78 28, 72 12, 50 12 Z" fill="#10b981" />
-            <circle cx="42" cy="33" r="2.5" fill="#064e3b" />
-            <circle cx="50" cy="33" r="2.5" fill="#064e3b" />
-            <circle cx="58" cy="33" r="2.5" fill="#064e3b" />
-            <circle cx="38" cy="43" r="2.5" fill="#064e3b" />
-            <circle cx="46" cy="43" r="2.5" fill="#064e3b" />
-            <circle cx="54" cy="43" r="2.5" fill="#064e3b" />
-            <circle cx="62" cy="43" r="2.5" fill="#064e3b" />
-            <circle cx="42" cy="53" r="2.5" fill="#064e3b" />
-            <circle cx="50" cy="53" r="2.5" fill="#064e3b" />
-            <circle cx="58" cy="53" r="2.5" fill="#064e3b" />
+          {/* Llenado reactivo Esmeralda de abajo hacia arriba */}
+          <g clipPath="url(#loader-fill-clip)" mask="url(#padel-holes-mask)">
+            <rect x="46" y="68" width="8" height="24" rx="4" fill="#10b981" />
+            <path d="M 50 14 C 30 14, 25 28, 25 46 C 25 64, 38 70, 50 70 C 62 70, 75 64, 75 46 C 75 28, 70 14, 50 14 Z" fill="#34d399" />
           </g>
         </svg>
 
-        {/* Pelota de pádel rebotando */}
-        <div className="anim-ball absolute -right-1 bottom-3 w-4 h-4 rounded-full bg-[#ccff00] shadow-[0_0_8px_rgba(204,255,0,0.8)] border border-lime-300" />
+        {/* Pelota de pádel animada que impacta con la paleta */}
+        <div className="absolute right-2 top-3 w-4 h-4 rounded-full bg-[#ccff00] shadow-[0_0_12px_rgba(204,255,0,0.9)] border border-lime-300 anim-ball-bounce z-10" />
       </div>
 
-      <p className="mt-4 text-sm font-semibold tracking-wide text-zinc-400 animate-pulse">
+      <p className="mt-5 text-xs sm:text-sm font-bold tracking-wider text-emerald-400 uppercase animate-pulse">
         {texto}
       </p>
     </div>
@@ -170,13 +179,11 @@ export default function App() {
 
   // Funciones de validación para inputs
   const manejarCambioNombre = (valor) => {
-    // Permite únicamente letras y espacios (elimina números y símbolos)
     const filtrado = valor.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
     setNombre(filtrado);
   };
 
   const manejarCambioTelefono = (valor) => {
-    // Permite únicamente dígitos numéricos
     const filtrado = valor.replace(/\D/g, '');
     setTelefono(filtrado);
   };
@@ -323,22 +330,20 @@ export default function App() {
     const nombreFinal = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
     const telFinal = telefono.replace(/\D/g, '').trim();
 
-    const lineas = [
-      `¡Hola ${club?.nombre || 'Padel Central'}! 👋`,
-      `Acabo de reservar un turno por la web:`,
-      ``,
-      `🎾 *Pista:* ${canchaNombre}`,
-      `📅 *Fecha:* ${fecha}`,
-      `⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs`,
-      `👤 *Jugador:* ${nombreFinal}`,
-      `📱 *Teléfono:* ${telFinal}`,
-      ``,
-      `¿Me confirman la reserva? ¡Muchas gracias! ✨`
-    ];
+    // Mensaje en formato nativo limpio
+    const textoMensaje = 
+`¡Hola ${club?.nombre || 'Padel Central'}! 👋
+Acabo de reservar un turno por la web:
 
-    const textoCompleto = lineas.join('\n');
+🎾 *Pista:* ${canchaNombre}
+📅 *Fecha:* ${fecha}
+⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs
+👤 *Jugador:* ${nombreFinal}
+📱 *Teléfono:* ${telFinal}
+
+¿Me confirman la reserva? ¡Muchas gracias! ✨`;
+
     let num = (club?.telefono || '2494641010').replace(/\D/g, '');
-
     if (num.startsWith('0')) num = num.substring(1);
     if (num.includes('15') && num.length === 12) num = num.replace('15', '');
 
@@ -351,7 +356,7 @@ export default function App() {
       telefonoDestino = `549${num}`;
     }
 
-    const urlWhatsApp = `https://wa.me/${telefonoDestino}?text=${encodeURIComponent(textoCompleto)}`;
+    const urlWhatsApp = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${encodeURIComponent(textoMensaje)}`;
 
     try {
       await axios.post(`${API_BASE}/reservas`, {
@@ -369,8 +374,8 @@ export default function App() {
       setTelefono('');
       setSlotSeleccionado(null);
 
-      // Redirección nativa móvil
-      window.location.href = urlWhatsApp;
+      // Redirección directa nativa
+      window.location.assign(urlWhatsApp);
     } catch (err) {
       setMostrarModalConfirmacionWA(false);
       setMensaje({ tipo: 'error', texto: err.response?.data || 'Error al reservar el turno' });
@@ -918,6 +923,14 @@ export default function App() {
                   />
                 </div>
 
+                {/* Nota contextual */}
+                <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <p className="leading-snug">
+                    Se bloquearán los turnos libres. Los turnos ya reservados por clientes permanecerán intactos para que puedas avisarles antes de liberarlos.
+                  </p>
+                </div>
+
                 <div className="flex gap-2 pt-2">
                   <button
                     type="button"
@@ -1045,6 +1058,7 @@ export default function App() {
                 <p className="text-sm text-zinc-500 py-8 text-center font-medium">No hay reservas ni bloqueos para mostrar.</p>
               ) : (
                 <>
+                  {/* Vista Tarjetas para Celulares */}
                   <div className="grid grid-cols-1 gap-2.5 sm:hidden">
                     {reservasAdminFiltradas.map((reserva) => {
                       const esBloqueado = reserva.estado === 'BLOQUEADO';
@@ -1093,6 +1107,7 @@ export default function App() {
                     })}
                   </div>
 
+                  {/* Vista Tabla para Pantallas Medianas/Grandes */}
                   <div className="hidden sm:block overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
