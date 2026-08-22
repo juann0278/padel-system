@@ -168,6 +168,19 @@ export default function App() {
   // Modal de confirmación obligatoria WhatsApp
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
 
+  // Funciones de validación para inputs
+  const manejarCambioNombre = (valor) => {
+    // Permite únicamente letras y espacios (elimina números y símbolos)
+    const filtrado = valor.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+    setNombre(filtrado);
+  };
+
+  const manejarCambioTelefono = (valor) => {
+    // Permite únicamente dígitos numéricos
+    const filtrado = valor.replace(/\D/g, '');
+    setTelefono(filtrado);
+  };
+
   // Cálculo dinámico según la hora actual
   const estaAbierto = useMemo(() => {
     const ahora = new Date();
@@ -289,7 +302,15 @@ export default function App() {
       alert('El complejo se encuentra cerrado en este momento.');
       return;
     }
-    if (!slotSeleccionado || !nombre || !telefono) return;
+    const nombreLimpio = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+    const telLimpio = telefono.replace(/\D/g, '').trim();
+
+    if (!slotSeleccionado || !nombreLimpio || !telLimpio) {
+      alert('Por favor, verificá tus datos ingresados.');
+      return;
+    }
+    setNombre(nombreLimpio);
+    setTelefono(telLimpio);
     setMostrarModalConfirmacionWA(true);
   };
 
@@ -299,8 +320,9 @@ export default function App() {
 
     const canchaObj = canchas.find(c => c.id === canchaSeleccionada);
     const canchaNombre = canchaObj ? canchaObj.nombre : 'Cancha';
+    const nombreFinal = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+    const telFinal = telefono.replace(/\D/g, '').trim();
 
-    // Formateo del mensaje
     const lineas = [
       `¡Hola ${club?.nombre || 'Padel Central'}! 👋`,
       `Acabo de reservar un turno por la web:`,
@@ -308,8 +330,8 @@ export default function App() {
       `🎾 *Pista:* ${canchaNombre}`,
       `📅 *Fecha:* ${fecha}`,
       `⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs`,
-      `👤 *Jugador:* ${nombre}`,
-      `📱 *Teléfono:* ${telefono}`,
+      `👤 *Jugador:* ${nombreFinal}`,
+      `📱 *Teléfono:* ${telFinal}`,
       ``,
       `¿Me confirman la reserva? ¡Muchas gracias! ✨`
     ];
@@ -336,8 +358,8 @@ export default function App() {
         canchaId: canchaSeleccionada,
         fecha,
         horaInicio: slotSeleccionado.horaInicio,
-        nombreCliente: nombre,
-        telefonoCliente: telefono
+        nombreCliente: nombreFinal,
+        telefonoCliente: telFinal
       });
 
       setMostrarModalConfirmacionWA(false);
@@ -347,7 +369,7 @@ export default function App() {
       setTelefono('');
       setSlotSeleccionado(null);
 
-      // Redirección nativa compatible con navegadores móviles
+      // Redirección nativa móvil
       window.location.href = urlWhatsApp;
     } catch (err) {
       setMostrarModalConfirmacionWA(false);
@@ -372,7 +394,8 @@ export default function App() {
     setAdminError('');
 
     const horaFormateada = adminHoraInicio.length === 5 ? `${adminHoraInicio}:00` : adminHoraInicio;
-    const telefonoFinal = adminTelefono.trim() || 'Sin teléfono';
+    const nombreAdminFinal = adminNombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim() || 'Sin nombre';
+    const telefonoFinal = adminTelefono.replace(/\D/g, '').trim() || 'Sin teléfono';
 
     try {
       if (adminEsFijo) {
@@ -380,7 +403,7 @@ export default function App() {
           canchaId: Number(adminCanchaId),
           fechaInicio: adminFecha,
           horaInicio: horaFormateada,
-          nombreCliente: adminNombre,
+          nombreCliente: nombreAdminFinal,
           telefonoCliente: telefonoFinal,
           semanas: Number(adminSemanas)
         });
@@ -389,7 +412,7 @@ export default function App() {
           canchaId: Number(adminCanchaId),
           fecha: adminFecha,
           horaInicio: horaFormateada,
-          nombreCliente: adminNombre,
+          nombreCliente: nombreAdminFinal,
           telefonoCliente: telefonoFinal
         });
       }
@@ -704,6 +727,7 @@ export default function App() {
                   <input
                     type="text"
                     required
+                    inputMode="text"
                     placeholder="Ej: Grupo Jueves / Juan Pérez"
                     value={adminNombre}
                     onChange={(e) => setAdminNombre(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
@@ -715,6 +739,8 @@ export default function App() {
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Teléfono (Opcional)</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="Ej: 2494112233"
                     value={adminTelefono}
                     onChange={(e) => setAdminTelefono(e.target.value.replace(/\D/g, ''))}
@@ -1272,9 +1298,11 @@ export default function App() {
                         <input
                           type="text"
                           required
+                          inputMode="text"
+                          autoComplete="name"
                           placeholder="Ej: Juan Pérez"
                           value={nombre}
-                          onChange={(e) => setNombre(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
+                          onChange={(e) => manejarCambioNombre(e.target.value)}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-400 transition"
                         />
                       </div>
@@ -1283,9 +1311,12 @@ export default function App() {
                         <input
                           type="tel"
                           required
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          autoComplete="tel"
                           placeholder="Ej: 2494123456"
                           value={telefono}
-                          onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                          onChange={(e) => manejarCambioTelefono(e.target.value)}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-400 transition"
                         />
                       </div>
