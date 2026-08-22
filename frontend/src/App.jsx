@@ -170,7 +170,7 @@ export default function App() {
   // Modal de confirmación obligatoria WhatsApp
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
 
-  // Auto-limpiar el cartel a los 30 segundos
+  // Auto-limpiar el cartel a los 30 segundos si no lo cierran
   useEffect(() => {
     if (mensaje) {
       const timer = setTimeout(() => {
@@ -355,7 +355,12 @@ Acabo de reservar un turno por la web:
       telefonoDestino = `549${num}`;
     }
 
-    const urlWhatsApp = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${encodeURIComponent(textoMensaje)}`;
+    const textoEncoded = encodeURIComponent(textoMensaje);
+    
+    // Esquema directo nativo para app de WhatsApp (sin intermediarios ni preguntas en celus)
+    const schemeWhatsAppMobile = `whatsapp://send?phone=${telefonoDestino}&text=${textoEncoded}`;
+    // URL web para PC
+    const urlWhatsAppWeb = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${textoEncoded}`;
 
     try {
       await axios.post(`${API_BASE}/reservas`, {
@@ -366,29 +371,28 @@ Acabo de reservar un turno por la web:
         telefonoCliente: telFinal
       });
 
-      setMostrarModalConfirmacionWA(false);
+      // Se limpia el estado de fondo para cuando el usuario vuelva
       setMensaje({ tipo: 'exito', texto: '¡Turno reservado con éxito! Nos vemos en la cancha.' });
       cargarSlots();
       setNombre('');
       setTelefono('');
       setSlotSeleccionado(null);
 
-      // Disparo compatible con Mobile y Desktop evitando bloqueos de pop-up
       const esMovil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (esMovil) {
-        // En móvil crea un link y lo clickea directamente para saltar a la App nativa de WhatsApp
-        const link = document.createElement('a');
-        link.href = urlWhatsApp;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // En celular salta directo a la app nativa sin parpadeo de pantalla previa
+        window.location.href = schemeWhatsAppMobile;
+        setTimeout(() => {
+          setMostrarModalConfirmacionWA(false);
+        }, 600);
       } else {
-        // En PC abre WhatsApp Web en pestaña nueva
-        window.open(urlWhatsApp, '_blank');
+        // En PC abre WhatsApp Web en pestaña nueva y cierra el modal
+        window.open(urlWhatsAppWeb, '_blank');
+        setMostrarModalConfirmacionWA(false);
       }
     } catch (err) {
-      setMostrarModalConfirmacionWA(false);
       setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al reservar el turno' });
+      setMostrarModalConfirmacionWA(false);
     } finally {
       setCargando(false);
     }
@@ -660,17 +664,19 @@ Acabo de reservar un turno por la web:
                   className="w-full flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs uppercase tracking-wider py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 transition disabled:opacity-50 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 fill-current" />
-                  {cargando ? 'Confirmando...' : 'Enviar Confirmación por WhatsApp'}
+                  {cargando ? 'Abriendo WhatsApp...' : 'Enviar Confirmación por WhatsApp'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setMostrarModalConfirmacionWA(false)}
-                  className="w-full text-zinc-500 hover:text-zinc-300 font-semibold text-xs py-2 transition cursor-pointer"
-                >
-                  Modificar datos
-                </button>
+                {!cargando && (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarModalConfirmacionWA(false)}
+                    className="w-full text-zinc-500 hover:text-zinc-300 font-semibold text-xs py-2 transition cursor-pointer"
+                  >
+                    Modificar datos
+                  </button>
+                )}
               </div>
             </div>
           </div>
