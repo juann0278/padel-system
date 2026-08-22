@@ -1,0 +1,68 @@
+.padel-loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    min-height: 250px;
+  }
+  
+  .padel-icon-wrapper {
+    position: relative;
+    width: 70px;
+    height: 70px;
+  }
+  
+  .padel-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-15deg);
+    filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.3));
+  }
+  
+  /* Animación de llenado vertical */
+  .liquid-fill {
+    animation: fillAnimation 2s infinite ease-in-out;
+  }
+  
+  @keyframes fillAnimation {
+    0% {
+      transform: translateY(100px);
+    }
+    50% {
+      transform: translateY(10px);
+    }
+    100% {
+      transform: translateY(100px);
+    }
+  }
+  
+  /* Pelotita de pádel */
+  .padel-ball {
+    position: absolute;
+    right: -2px;
+    bottom: 8px;
+    width: 14px;
+    height: 14px;
+    background-color: #ccff00; /* Color verde/amarillo pádel */
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(204, 255, 0, 0.6);
+    animation: bounce 1s infinite alternate ease-out;
+  }
+  
+  @keyframes bounce {
+    0% {
+      transform: translateY(0);
+    }
+    100% {
+      transform: translateY(-16px);
+    }
+  }
+  
+  .loader-text {
+    margin-top: 1.2rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #94a3b8;
+    letter-spacing: 0.5px;
+  }

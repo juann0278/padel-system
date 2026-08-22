@@ -41,6 +41,80 @@ const obtenerFechaLocalISO = (fechaObj = new Date()) => {
   return `${anio}-${mes}-${dia}`;
 };
 
+// Componente visual de carga animado con temática de Pádel
+function PadelLoader({ texto = "Cargando complejo..." }) {
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
+      <style>{`
+        @keyframes fillPadel {
+          0% { transform: translateY(85px); }
+          50% { transform: translateY(5px); }
+          100% { transform: translateY(85px); }
+        }
+        @keyframes bounceBall {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(-18px); }
+        }
+        .anim-fill {
+          animation: fillPadel 2s infinite ease-in-out;
+        }
+        .anim-ball {
+          animation: bounceBall 0.8s infinite alternate ease-out;
+        }
+      `}</style>
+
+      <div className="relative w-20 h-20 flex items-center justify-center">
+        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-12 filter drop-shadow-[0_0_12px_rgba(52,211,153,0.35)]">
+          <defs>
+            <clipPath id="loader-padel-clip">
+              <rect className="anim-fill" x="0" y="0" width="100" height="100" />
+            </clipPath>
+          </defs>
+
+          {/* Silueta de fondo */}
+          <g>
+            <rect x="45" y="66" width="10" height="26" rx="4" fill="#27272a" />
+            <path d="M 50 12 C 28 12, 22 28, 22 45 C 22 62, 38 68, 50 68 C 62 68, 78 62, 78 45 C 78 28, 72 12, 50 12 Z" fill="#18181b" stroke="#3f3f46" strokeWidth="3" />
+            <circle cx="42" cy="33" r="2.5" fill="#09090b" />
+            <circle cx="50" cy="33" r="2.5" fill="#09090b" />
+            <circle cx="58" cy="33" r="2.5" fill="#09090b" />
+            <circle cx="38" cy="43" r="2.5" fill="#09090b" />
+            <circle cx="46" cy="43" r="2.5" fill="#09090b" />
+            <circle cx="54" cy="43" r="2.5" fill="#09090b" />
+            <circle cx="62" cy="43" r="2.5" fill="#09090b" />
+            <circle cx="42" cy="53" r="2.5" fill="#09090b" />
+            <circle cx="50" cy="53" r="2.5" fill="#09090b" />
+            <circle cx="58" cy="53" r="2.5" fill="#09090b" />
+          </g>
+
+          {/* Relleno Esmeralda reactivo animado */}
+          <g clipPath="url(#loader-padel-clip)">
+            <rect x="45" y="66" width="10" height="26" rx="4" fill="#34d399" />
+            <path d="M 50 12 C 28 12, 22 28, 22 45 C 22 62, 38 68, 50 68 C 62 68, 78 62, 78 45 C 78 28, 72 12, 50 12 Z" fill="#10b981" />
+            <circle cx="42" cy="33" r="2.5" fill="#064e3b" />
+            <circle cx="50" cy="33" r="2.5" fill="#064e3b" />
+            <circle cx="58" cy="33" r="2.5" fill="#064e3b" />
+            <circle cx="38" cy="43" r="2.5" fill="#064e3b" />
+            <circle cx="46" cy="43" r="2.5" fill="#064e3b" />
+            <circle cx="54" cy="43" r="2.5" fill="#064e3b" />
+            <circle cx="62" cy="43" r="2.5" fill="#064e3b" />
+            <circle cx="42" cy="53" r="2.5" fill="#064e3b" />
+            <circle cx="50" cy="53" r="2.5" fill="#064e3b" />
+            <circle cx="58" cy="53" r="2.5" fill="#064e3b" />
+          </g>
+        </svg>
+
+        {/* Pelota de pádel rebotando */}
+        <div className="anim-ball absolute -right-1 bottom-3 w-4 h-4 rounded-full bg-[#ccff00] shadow-[0_0_8px_rgba(204,255,0,0.8)] border border-lime-300" />
+      </div>
+
+      <p className="mt-4 text-sm font-semibold tracking-wide text-zinc-400 animate-pulse">
+        {texto}
+      </p>
+    </div>
+  );
+}
+
 export default function App() {
   const [vistaAdmin, setVistaAdmin] = useState(false);
   const [estaAutenticado, setEstaAutenticado] = useState(false);
@@ -369,12 +443,9 @@ export default function App() {
     );
   }
 
+  // Loader visual mientras carga el backend
   if (!club) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 font-medium">
-        Cargando complejo...
-      </div>
-    );
+    return <PadelLoader texto="Cargando complejo..." />;
   }
 
   return (
