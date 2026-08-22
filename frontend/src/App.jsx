@@ -74,7 +74,6 @@ function PadelLoader({ texto = "Cargando complejo..." }) {
       `}</style>
 
       <div className="relative w-28 h-28 flex items-center justify-center">
-        {/* Glow de fondo */}
         <div className="absolute w-20 h-20 rounded-full bg-emerald-500/20 blur-xl pointer-events-none" />
 
         <svg viewBox="0 0 100 100" className="w-24 h-24 anim-padel filter drop-shadow-[0_0_14px_rgba(52,211,153,0.4)] overflow-visible">
@@ -85,7 +84,6 @@ function PadelLoader({ texto = "Cargando complejo..." }) {
 
             <mask id="padel-holes-mask">
               <rect x="0" y="0" width="100" height="100" fill="white" />
-              {/* Agujeros de la paleta */}
               <circle cx="43" cy="36" r="2.8" fill="black" />
               <circle cx="50" cy="36" r="2.8" fill="black" />
               <circle cx="57" cy="36" r="2.8" fill="black" />
@@ -99,22 +97,17 @@ function PadelLoader({ texto = "Cargando complejo..." }) {
             </mask>
           </defs>
 
-          {/* Silueta base oscura con mango */}
           <g mask="url(#padel-holes-mask)">
-            {/* Grip / Mango */}
             <rect x="46" y="68" width="8" height="24" rx="4" fill="#27272a" stroke="#3f3f46" strokeWidth="1.5" />
-            {/* Cabeza de la paleta */}
             <path d="M 50 14 C 30 14, 25 28, 25 46 C 25 64, 38 70, 50 70 C 62 70, 75 64, 75 46 C 75 28, 70 14, 50 14 Z" fill="#18181b" stroke="#3f3f46" strokeWidth="2" />
           </g>
 
-          {/* Llenado reactivo Esmeralda de abajo hacia arriba */}
           <g clipPath="url(#loader-fill-clip)" mask="url(#padel-holes-mask)">
             <rect x="46" y="68" width="8" height="24" rx="4" fill="#10b981" />
             <path d="M 50 14 C 30 14, 25 28, 25 46 C 25 64, 38 70, 50 70 C 62 70, 75 64, 75 46 C 75 28, 70 14, 50 14 Z" fill="#34d399" />
           </g>
         </svg>
 
-        {/* Pelota de pádel animada que impacta con la paleta */}
         <div className="absolute right-2 top-3 w-4 h-4 rounded-full bg-[#ccff00] shadow-[0_0_12px_rgba(204,255,0,0.9)] border border-lime-300 anim-ball-bounce z-10" />
       </div>
 
@@ -177,17 +170,16 @@ export default function App() {
   // Modal de confirmación obligatoria WhatsApp
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
 
-  // Auto-limpiar el cartel a los 8 segundos si no lo cierran con la X
+  // Auto-limpiar el cartel a los 30 segundos
   useEffect(() => {
     if (mensaje) {
       const timer = setTimeout(() => {
         setMensaje(null);
-      }, 8000);
+      }, 30000);
       return () => clearTimeout(timer);
     }
   }, [mensaje]);
 
-  // Funciones de validación para inputs
   const manejarCambioNombre = (valor) => {
     const filtrado = valor.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
     setNombre(filtrado);
@@ -198,7 +190,6 @@ export default function App() {
     setTelefono(filtrado);
   };
 
-  // Cálculo dinámico según la hora actual
   const estaAbierto = useMemo(() => {
     const ahora = new Date();
     const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
@@ -382,8 +373,19 @@ Acabo de reservar un turno por la web:
       setTelefono('');
       setSlotSeleccionado(null);
 
-      // Abre WhatsApp en pestaña/app nativa sin perder la web
-      window.open(urlWhatsApp, '_blank');
+      // Disparo compatible con Mobile y Desktop evitando bloqueos de pop-up
+      const esMovil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (esMovil) {
+        // En móvil crea un link y lo clickea directamente para saltar a la App nativa de WhatsApp
+        const link = document.createElement('a');
+        link.href = urlWhatsApp;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // En PC abre WhatsApp Web en pestaña nueva
+        window.open(urlWhatsApp, '_blank');
+      }
     } catch (err) {
       setMostrarModalConfirmacionWA(false);
       setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al reservar el turno' });
@@ -931,7 +933,6 @@ Acabo de reservar un turno por la web:
                   />
                 </div>
 
-                {/* Nota contextual */}
                 <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-start gap-2.5">
                   <Info className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <p className="leading-snug">
@@ -1196,7 +1197,7 @@ Acabo de reservar un turno por la web:
             ) : (
               <>
                 {mensaje && (
-                  <div className={`p-4 sm:p-5 rounded-3xl border backdrop-blur-md shadow-2xl flex items-center justify-between gap-3 ${
+                  <div className={`p-4 sm:p-5 rounded-3xl border backdrop-blur-md shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${
                     mensaje.tipo === 'exito' 
                       ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200' 
                       : 'bg-rose-950/80 border-rose-800 text-rose-300'
