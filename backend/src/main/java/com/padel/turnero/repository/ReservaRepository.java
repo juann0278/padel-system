@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ReservaRepository extends JpaRepository<Reserva, Long> {
@@ -18,7 +19,9 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
 
     List<Reserva> findByCanchaIdAndFechaAndEstadoNot(Long canchaId, LocalDate fecha, EstadoReserva estado);
 
-    List<Reserva> findByCanchaClubIdAndFecha(Long clubId, LocalDate fecha);
+    List<Reserva> findByCanchaClubIdAndFechaOrderByHoraInicioAsc(Long clubId, LocalDate fecha);
+
+    Optional<Reserva> findByCanchaIdAndFechaAndHoraInicio(Long canchaId, LocalDate fecha, LocalTime horaInicio);
 
     boolean existsByCanchaIdAndFechaAndHoraInicioAndEstadoNot(
             Long canchaId, LocalDate fecha, LocalTime horaInicio, EstadoReserva estado

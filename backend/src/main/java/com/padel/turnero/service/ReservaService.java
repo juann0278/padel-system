@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,10 @@ public class ReservaService {
     public List<SlotHorarioDTO> obtenerDisponibilidad(Long canchaId, LocalDate fecha) {
         List<Reserva> reservas = reservaRepository.findByCanchaIdAndFechaAndEstadoNot(canchaId, fecha, EstadoReserva.CANCELADO);
 
+        LocalDate hoy = LocalDate.now();
+        LocalTime ahora = LocalTime.now();
+        boolean esHoy = fecha.equals(hoy);
+
         List<LocalTime> horarios = List.of(
                 LocalTime.of(8, 0), LocalTime.of(9, 30), LocalTime.of(11, 0),
                 LocalTime.of(12, 30), LocalTime.of(14, 0), LocalTime.of(15, 30),
@@ -37,16 +42,20 @@ public class ReservaService {
 
         List<SlotHorarioDTO> slots = new ArrayList<>();
         for (LocalTime h : horarios) {
-            // El fin de turno para 23:00 lo limitamos a 23:59:59 o cálculo seguro
             LocalTime fin = h.equals(LocalTime.of(23, 0)) ? LocalTime.of(23, 59, 59) : h.plusMinutes(90);
 
-            // Verificamos si existe una reserva que empiece a esa misma hora o se solape
+            // 1. Verificamos si ya está ocupado por otra reserva o bloqueo
             boolean ocupado = reservas.stream().anyMatch(r ->
                     r.getHoraInicio().equals(h) ||
                             (!h.equals(LocalTime.of(23, 0)) && h.isBefore(r.getHoraFin()) && fin.isAfter(r.getHoraInicio()))
             );
 
-            slots.add(new SlotHorarioDTO(h, fin, !ocupado));
+            // 2. Si la consulta es para el día de hoy y el horario ya pasó, se inhabilita
+            boolean yaPaso = esHoy && h.isBefore(ahora);
+
+            boolean disponible = !ocupado && !yaPaso;
+
+            slots.add(new SlotHorarioDTO(h, fin, disponible));
         }
         return slots;
     }
@@ -56,7 +65,14 @@ public class ReservaService {
         Cancha cancha = canchaRepository.findById(dto.getCanchaId())
                 .orElseThrow(() -> new RuntimeException("Cancha no encontrada"));
 
-        LocalTime horaFin = dto.getHoraInicio().plusMinutes(90);
+        // Validar que no se intente reservar un horario que ya pasó hoy
+        if (dto.getFecha().equals(LocalDate.now()) && dto.getHoraInicio().isBefore(LocalTime.now())) {
+            throw new RuntimeException("No se pueden reservar turnos en horarios pasados.");
+        }
+
+        LocalTime horaFin = dto.getHoraInicio().equals(LocalTime.of(23, 0))
+                ? LocalTime.of(23, 59, 59)
+                : dto.getHoraInicio().plusMinutes(90);
 
         boolean solapa = reservaRepository.existeSolapamiento(
                 cancha.getId(), dto.getFecha(), dto.getHoraInicio(), horaFin, EstadoReserva.CANCELADO
@@ -64,6 +80,19 @@ public class ReservaService {
 
         if (solapa) {
             throw new RuntimeException("El turno ya no está disponible en ese horario.");
+        }
+
+        Optional<Reserva> existenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
+                cancha.getId(), dto.getFecha(), dto.getHoraInicio()
+        );
+
+        if (existenteOpt.isPresent()) {
+            Reserva r = existenteOpt.get();
+            r.setNombreCliente(dto.getNombreCliente());
+            r.setTelefonoCliente(dto.getTelefonoCliente());
+            r.setEstado(EstadoReserva.CONFIRMADO);
+            r.setHoraFin(horaFin);
+            return reservaRepository.save(r);
         }
 
         Reserva reserva = Reserva.builder()
@@ -84,7 +113,10 @@ public class ReservaService {
         Cancha cancha = canchaRepository.findById(dto.getCanchaId())
                 .orElseThrow(() -> new RuntimeException("Cancha no encontrada"));
 
-        LocalTime horaFin = dto.getHoraInicio().plusMinutes(90);
+        LocalTime horaFin = dto.getHoraInicio().equals(LocalTime.of(23, 0))
+                ? LocalTime.of(23, 59, 59)
+                : dto.getHoraInicio().plusMinutes(90);
+
         int semanas = dto.getSemanas() > 0 ? dto.getSemanas() : 4;
 
         for (int i = 0; i < semanas; i++) {
@@ -100,23 +132,37 @@ public class ReservaService {
         List<Reserva> creadas = new ArrayList<>();
         for (int i = 0; i < semanas; i++) {
             LocalDate fechaTurno = dto.getFechaInicio().plusWeeks(i);
-            Reserva reserva = Reserva.builder()
-                    .cancha(cancha)
-                    .fecha(fechaTurno)
-                    .horaInicio(dto.getHoraInicio())
-                    .horaFin(horaFin)
-                    .nombreCliente(dto.getNombreCliente() + " (Fijo)")
-                    .telefonoCliente(dto.getTelefonoCliente())
-                    .estado(EstadoReserva.CONFIRMADO)
-                    .build();
-            creadas.add(reservaRepository.save(reserva));
+
+            Optional<Reserva> existenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
+                    cancha.getId(), fechaTurno, dto.getHoraInicio()
+            );
+
+            if (existenteOpt.isPresent()) {
+                Reserva r = existenteOpt.get();
+                r.setNombreCliente(dto.getNombreCliente() + " (Fijo)");
+                r.setTelefonoCliente(dto.getTelefonoCliente());
+                r.setEstado(EstadoReserva.CONFIRMADO);
+                r.setHoraFin(horaFin);
+                creadas.add(reservaRepository.save(r));
+            } else {
+                Reserva reserva = Reserva.builder()
+                        .cancha(cancha)
+                        .fecha(fechaTurno)
+                        .horaInicio(dto.getHoraInicio())
+                        .horaFin(horaFin)
+                        .nombreCliente(dto.getNombreCliente() + " (Fijo)")
+                        .telefonoCliente(dto.getTelefonoCliente())
+                        .estado(EstadoReserva.CONFIRMADO)
+                        .build();
+                creadas.add(reservaRepository.save(reserva));
+            }
         }
 
         return creadas;
     }
 
     public List<Reserva> obtenerReservasAdmin(Long clubId, LocalDate fecha) {
-        return reservaRepository.findByCanchaClubIdAndFecha(clubId, fecha);
+        return reservaRepository.findByCanchaClubIdAndFechaOrderByHoraInicioAsc(clubId, fecha);
     }
 
     @Transactional
@@ -142,21 +188,17 @@ public class ReservaService {
         List<LocalTime> horariosABloquear = new ArrayList<>();
 
         if (dto.getHoraInicio() == null) {
-            // Día completo
             horariosABloquear.addAll(todosLosHorarios);
         } else if (dto.isHastaElCierre()) {
-            // Desde la hora seleccionada hasta la última del día (para Torneos)
             for (LocalTime h : todosLosHorarios) {
                 if (!h.isBefore(dto.getHoraInicio())) {
                     horariosABloquear.add(h);
                 }
             }
         } else {
-            // Un solo turno específico
             horariosABloquear.add(dto.getHoraInicio());
         }
 
-        // Canchas a bloquear
         List<Cancha> canchasABloquear = new ArrayList<>();
         if (dto.getCanchaId() != null && dto.getCanchaId() > 0) {
             canchasABloquear.add(canchaRepository.findById(dto.getCanchaId())
@@ -173,11 +215,20 @@ public class ReservaService {
                         ? LocalTime.of(23, 59, 59)
                         : hora.plusMinutes(90);
 
-                boolean existe = reservaRepository.existsByCanchaIdAndFechaAndHoraInicioAndEstadoNot(
-                        cancha.getId(), dto.getFecha(), hora, EstadoReserva.CANCELADO
+                Optional<Reserva> reservaExistenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
+                        cancha.getId(), dto.getFecha(), hora
                 );
 
-                if (!existe) {
+                if (reservaExistenteOpt.isPresent()) {
+                    Reserva r = reservaExistenteOpt.get();
+                    if (r.getEstado() == EstadoReserva.CANCELADO || r.getEstado() == EstadoReserva.BLOQUEADO) {
+                        r.setEstado(EstadoReserva.BLOQUEADO);
+                        r.setNombreCliente("⛔ " + motivo);
+                        r.setTelefonoCliente("ADMIN");
+                        r.setHoraFin(horaFin);
+                        reservaRepository.save(r);
+                    }
+                } else {
                     Reserva bloqueo = Reserva.builder()
                             .cancha(cancha)
                             .fecha(dto.getFecha())
