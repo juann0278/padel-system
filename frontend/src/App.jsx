@@ -356,10 +356,7 @@ Acabo de reservar un turno por la web:
     }
 
     const textoEncoded = encodeURIComponent(textoMensaje);
-    
-    // Esquema directo nativo para app de WhatsApp (sin intermediarios ni preguntas en celus)
     const schemeWhatsAppMobile = `whatsapp://send?phone=${telefonoDestino}&text=${textoEncoded}`;
-    // URL web para PC
     const urlWhatsAppWeb = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${textoEncoded}`;
 
     try {
@@ -371,7 +368,6 @@ Acabo de reservar un turno por la web:
         telefonoCliente: telFinal
       });
 
-      // Se limpia el estado de fondo para cuando el usuario vuelva
       setMensaje({ tipo: 'exito', texto: '¡Turno reservado con éxito! Nos vemos en la cancha.' });
       cargarSlots();
       setNombre('');
@@ -380,13 +376,11 @@ Acabo de reservar un turno por la web:
 
       const esMovil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (esMovil) {
-        // En celular salta directo a la app nativa sin parpadeo de pantalla previa
         window.location.href = schemeWhatsAppMobile;
         setTimeout(() => {
           setMostrarModalConfirmacionWA(false);
         }, 600);
       } else {
-        // En PC abre WhatsApp Web en pestaña nueva y cierra el modal
         window.open(urlWhatsAppWeb, '_blank');
         setMostrarModalConfirmacionWA(false);
       }
@@ -597,7 +591,7 @@ Acabo de reservar un turno por la web:
                   placeholder="Contraseña"
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3.5 text-white text-sm focus:outline-none focus:border-emerald-500 transition"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3.5 text-white text-base sm:text-sm focus:outline-none focus:border-emerald-500 transition"
                   autoFocus
                 />
                 {errorLogin && <p className="text-xs text-rose-400 font-medium">{errorLogin}</p>}
@@ -711,7 +705,7 @@ Acabo de reservar un turno por la web:
                   <select
                     value={adminCanchaId}
                     onChange={(e) => setAdminCanchaId(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 appearance-none"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500 appearance-none"
                   >
                     {canchas.map(c => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
@@ -726,7 +720,7 @@ Acabo de reservar un turno por la web:
                       type="date"
                       value={adminFecha}
                       onChange={(e) => setAdminFecha(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer"
                     />
                   </div>
                   <div className="w-full min-w-0">
@@ -734,7 +728,7 @@ Acabo de reservar un turno por la web:
                     <select
                       value={adminHoraInicio}
                       onChange={(e) => setAdminHoraInicio(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 appearance-none"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500 appearance-none"
                     >
                       {["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00", "21:30", "23:00"].map((h) => (
                         <option key={h} value={`${h}:00`}>{h} hs</option>
@@ -752,7 +746,7 @@ Acabo de reservar un turno por la web:
                     placeholder="Ej: Grupo Jueves / Juan Pérez"
                     value={adminNombre}
                     onChange={(e) => setAdminNombre(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
@@ -765,7 +759,7 @@ Acabo de reservar un turno por la web:
                     placeholder="Ej: 2494112233"
                     value={adminTelefono}
                     onChange={(e) => setAdminTelefono(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
@@ -788,7 +782,7 @@ Acabo de reservar un turno por la web:
                       <select
                         value={adminSemanas}
                         onChange={(e) => setAdminSemanas(e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-100 text-xs focus:outline-none focus:border-emerald-500 appearance-none"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-100 text-base sm:text-xs focus:outline-none focus:border-emerald-500 appearance-none"
                       >
                         <option value={4}>4 semanas (1 mes hacia adelante)</option>
                         <option value={8}>8 semanas (2 meses hacia adelante)</option>
@@ -847,7 +841,7 @@ Acabo de reservar un turno por la web:
                   <select
                     value={bloqueoCanchaId}
                     onChange={(e) => setBloqueoCanchaId(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-rose-500 appearance-none"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-rose-500 appearance-none"
                   >
                     <option value="0">🚨 Todas las canchas (Complejo entero)</option>
                     {canchas.map(c => (
@@ -862,7 +856,7 @@ Acabo de reservar un turno por la web:
                     type="date"
                     value={bloqueoFecha}
                     onChange={(e) => setBloqueoFecha(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-rose-500 appearance-none"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-rose-500 appearance-none"
                   />
                 </div>
 
@@ -917,7 +911,7 @@ Acabo de reservar un turno por la web:
                       <select
                         value={bloqueoHoraInicio}
                         onChange={(e) => setBloqueoHoraInicio(e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-100 text-xs focus:outline-none focus:border-rose-500 appearance-none"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-100 text-base sm:text-xs focus:outline-none focus:border-rose-500 appearance-none"
                       >
                         {["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00", "21:30", "23:00"].map((h) => (
                           <option key={h} value={h}>{h} hs</option>
@@ -935,7 +929,7 @@ Acabo de reservar un turno por la web:
                     placeholder="Ej: Torneo Anual / Lluvia / Luces"
                     value={bloqueoMotivo}
                     onChange={(e) => setBloqueoMotivo(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-rose-500"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-rose-500"
                   />
                 </div>
 
@@ -980,7 +974,7 @@ Acabo de reservar un turno por la web:
                     type="date"
                     value={fecha}
                     onChange={(e) => setFecha(e.target.value)}
-                    className="bg-zinc-950 border border-zinc-800 rounded-2xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500 text-sm cursor-pointer w-full sm:w-auto block appearance-none"
+                    className="bg-zinc-950 border border-zinc-800 rounded-2xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500 text-base sm:text-sm cursor-pointer w-full sm:w-auto block appearance-none"
                   />
                 </div>
               </div>
@@ -1345,7 +1339,7 @@ Acabo de reservar un turno por la web:
                           placeholder="Ej: Juan Pérez"
                           value={nombre}
                           onChange={(e) => manejarCambioNombre(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-400 transition"
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-400 transition"
                         />
                       </div>
                       <div>
@@ -1359,7 +1353,7 @@ Acabo de reservar un turno por la web:
                           placeholder="Ej: 2494123456"
                           value={telefono}
                           onChange={(e) => manejarCambioTelefono(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-400 transition"
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-400 transition"
                         />
                       </div>
                     </div>
