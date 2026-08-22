@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { 
   Clock, 
@@ -21,7 +21,8 @@ import {
   Ban, 
   Moon, 
   Eye, 
-  EyeOff 
+  EyeOff,
+  RefreshCw
 } from 'lucide-react';
 
 import FONDO from './assets/FONDO.jpg.avif';
@@ -195,51 +196,65 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    axios.get(`${API_BASE}/clubes/${CLUB_SLUG}`)
-      .then(res => setClub(res.data))
-      .catch(err => {
-        console.error("Error cargando club", err);
-        setErrorCarga("No se pudo conectar con el backend o no existe el club.");
-      });
+    const peticionClub = axios.get(`${API_BASE}/clubes/${CLUB_SLUG}`);
+    const peticionCanchas = axios.get(`${API_BASE}/clubes/${CLUB_SLUG}/canchas`);
+    const delayMinimo = new Promise(resolve => setTimeout(resolve, 1800));
 
-    axios.get(`${API_BASE}/clubes/${CLUB_SLUG}/canchas`)
-      .then(res => {
-        const data = Array.isArray(res.data) ? res.data : [];
+    Promise.all([peticionClub, peticionCanchas, delayMinimo])
+      .then(([resClub, resCanchas]) => {
+        setClub(resClub.data);
+        const data = Array.isArray(resCanchas.data) ? resCanchas.data : [];
         setCanchas(data);
         if (data.length > 0) {
           setCanchaSeleccionada(data[0].id);
           setAdminCanchaId(data[0].id);
         }
       })
-      .catch(err => console.error("Error canchas", err));
+      .catch(err => {
+        console.error("Error al cargar la aplicación", err);
+        setErrorCarga("No se pudo conectar con el backend o no existe el club.");
+      });
   }, []);
 
-  useEffect(() => {
-    if (!vistaAdmin && canchaSeleccionada && fecha && estaAbierto) {
-      cargarSlots();
-    }
-  }, [canchaSeleccionada, fecha, vistaAdmin, estaAbierto]);
-
-  useEffect(() => {
-    if (vistaAdmin && estaAutenticado && club?.id && fecha) {
-      cargarReservasAdmin();
-    }
-  }, [vistaAdmin, estaAutenticado, fecha, club]);
-
-  const cargarSlots = () => {
+  const cargarSlots = useCallback(() => {
+    if (!canchaSeleccionada || !fecha) return;
     axios.get(`${API_BASE}/reservas/disponibilidad?canchaId=${canchaSeleccionada}&fecha=${fecha}`)
       .then(res => {
-        setSlots(Array.isArray(res.data) ? res.data : []);
-        setSlotSeleccionado(null);
+        const nuevosSlots = Array.isArray(res.data) ? res.data : [];
+        setSlots(nuevosSlots);
+        setSlotSeleccionado(prev => {
+          if (!prev) return null;
+          const sigueDisponible = nuevosSlots.some(s => s.horaInicio === prev.horaInicio && s.disponible);
+          return sigueDisponible ? prev : null;
+        });
       })
       .catch(() => setSlots([]));
-  };
+  }, [canchaSeleccionada, fecha]);
 
-  const cargarReservasAdmin = () => {
+  const cargarReservasAdmin = useCallback(() => {
+    if (!club?.id || !fecha) return;
     axios.get(`${API_BASE}/reservas/admin?clubId=${club.id}&fecha=${fecha}`)
       .then(res => setReservasAdmin(Array.isArray(res.data) ? res.data : []))
       .catch(() => setReservasAdmin([]));
-  };
+  }, [club?.id, fecha]);
+
+  // Polling cada 12s para jugador
+  useEffect(() => {
+    if (!vistaAdmin && canchaSeleccionada && fecha && estaAbierto) {
+      cargarSlots();
+      const intervalId = setInterval(cargarSlots, 12000);
+      return () => clearInterval(intervalId);
+    }
+  }, [canchaSeleccionada, fecha, vistaAdmin, estaAbierto, cargarSlots]);
+
+  // Polling cada 12s para admin
+  useEffect(() => {
+    if (vistaAdmin && estaAutenticado && club?.id && fecha) {
+      cargarReservasAdmin();
+      const intervalId = setInterval(cargarReservasAdmin, 12000);
+      return () => clearInterval(intervalId);
+    }
+  }, [vistaAdmin, estaAutenticado, fecha, club?.id, cargarReservasAdmin]);
 
   const handleAccesoAdmin = () => {
     if (estaAutenticado) {
@@ -285,6 +300,37 @@ export default function App() {
     const canchaObj = canchas.find(c => c.id === canchaSeleccionada);
     const canchaNombre = canchaObj ? canchaObj.nombre : 'Cancha';
 
+    // Formateo del mensaje
+    const lineas = [
+      `¡Hola ${club?.nombre || 'Padel Central'}! 👋`,
+      `Acabo de reservar un turno por la web:`,
+      ``,
+      `🎾 *Pista:* ${canchaNombre}`,
+      `📅 *Fecha:* ${fecha}`,
+      `⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs`,
+      `👤 *Jugador:* ${nombre}`,
+      `📱 *Teléfono:* ${telefono}`,
+      ``,
+      `¿Me confirman la reserva? ¡Muchas gracias! ✨`
+    ];
+
+    const textoCompleto = lineas.join('\n');
+    let num = (club?.telefono || '2494641010').replace(/\D/g, '');
+
+    if (num.startsWith('0')) num = num.substring(1);
+    if (num.includes('15') && num.length === 12) num = num.replace('15', '');
+
+    let telefonoDestino = num;
+    if (num.startsWith('549')) {
+      telefonoDestino = num;
+    } else if (num.startsWith('54')) {
+      telefonoDestino = `549${num.substring(2)}`;
+    } else {
+      telefonoDestino = `549${num}`;
+    }
+
+    const urlWhatsApp = `https://wa.me/${telefonoDestino}?text=${encodeURIComponent(textoCompleto)}`;
+
     try {
       await axios.post(`${API_BASE}/reservas`, {
         canchaId: canchaSeleccionada,
@@ -294,43 +340,15 @@ export default function App() {
         telefonoCliente: telefono
       });
 
-      const lineas = [
-        `¡Hola ${club?.nombre || 'Padel Central'}! 👋`,
-        `Acabo de reservar un turno por la web:`,
-        ``,
-        `🎾 *Pista:* ${canchaNombre}`,
-        `📅 *Fecha:* ${fecha}`,
-        `⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs`,
-        `👤 *Jugador:* ${nombre}`,
-        `📱 *Teléfono:* ${telefono}`,
-        ``,
-        `¿Me confirman la reserva? ¡Muchas gracias! ✨`
-      ];
-
-      const textoCompleto = lineas.join('\n');
-      let num = (club?.telefono || '2494641010').replace(/\D/g, '');
-
-      if (num.startsWith('0')) num = num.substring(1);
-      if (num.includes('15') && num.length === 12) num = num.replace('15', '');
-
-      let telefonoDestino = num;
-      if (num.startsWith('549')) {
-        telefonoDestino = num;
-      } else if (num.startsWith('54')) {
-        telefonoDestino = `549${num.substring(2)}`;
-      } else {
-        telefonoDestino = `549${num}`;
-      }
-
-      const urlWhatsApp = `https://api.whatsapp.com/send/?phone=${telefonoDestino}&text=${encodeURIComponent(textoCompleto)}&type=phone_number&app_absent=0`;
-      window.open(urlWhatsApp, '_blank');
-
       setMostrarModalConfirmacionWA(false);
-      setMensaje({ tipo: 'exito', texto: '¡Turno confirmado y mensaje de WhatsApp generado!' });
+      setMensaje({ tipo: 'exito', texto: '¡Turno reservado! Redirigiendo a WhatsApp...' });
       cargarSlots();
       setNombre('');
       setTelefono('');
       setSlotSeleccionado(null);
+
+      // Redirección nativa compatible con navegadores móviles
+      window.location.href = urlWhatsApp;
     } catch (err) {
       setMostrarModalConfirmacionWA(false);
       setMensaje({ tipo: 'error', texto: err.response?.data || 'Error al reservar el turno' });
@@ -443,7 +461,6 @@ export default function App() {
     );
   }
 
-  // Loader visual mientras carga el backend
   if (!club) {
     return <PadelLoader texto="Cargando complejo..." />;
   }
@@ -689,7 +706,7 @@ export default function App() {
                     required
                     placeholder="Ej: Grupo Jueves / Juan Pérez"
                     value={adminNombre}
-                    onChange={(e) => setAdminNombre(e.target.value)}
+                    onChange={(e) => setAdminNombre(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -700,7 +717,7 @@ export default function App() {
                     type="tel"
                     placeholder="Ej: 2494112233"
                     value={adminTelefono}
-                    onChange={(e) => setAdminTelefono(e.target.value)}
+                    onChange={(e) => setAdminTelefono(e.target.value.replace(/\D/g, ''))}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -917,9 +934,14 @@ export default function App() {
 
             <div className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
-                <h2 className="text-base sm:text-lg font-extrabold text-emerald-400 flex items-center gap-2">
-                  <Shield className="w-5 h-5" /> Planilla Diaria
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-extrabold text-emerald-400 flex items-center gap-2">
+                    <Shield className="w-5 h-5" /> Planilla Diaria
+                  </h2>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <RefreshCw className="w-3 h-3 animate-spin" /> En vivo
+                  </span>
+                </div>
                 
                 <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                   <button
@@ -1252,7 +1274,7 @@ export default function App() {
                           required
                           placeholder="Ej: Juan Pérez"
                           value={nombre}
-                          onChange={(e) => setNombre(e.target.value)}
+                          onChange={(e) => setNombre(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-400 transition"
                         />
                       </div>
@@ -1263,7 +1285,7 @@ export default function App() {
                           required
                           placeholder="Ej: 2494123456"
                           value={telefono}
-                          onChange={(e) => setTelefono(e.target.value)}
+                          onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-sm focus:outline-none focus:border-emerald-400 transition"
                         />
                       </div>
