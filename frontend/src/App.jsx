@@ -177,6 +177,16 @@ export default function App() {
   // Modal de confirmación obligatoria WhatsApp
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
 
+  // Auto-limpiar el cartel a los 8 segundos si no lo cierran con la X
+  useEffect(() => {
+    if (mensaje) {
+      const timer = setTimeout(() => {
+        setMensaje(null);
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [mensaje]);
+
   // Funciones de validación para inputs
   const manejarCambioNombre = (valor) => {
     const filtrado = valor.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
@@ -323,14 +333,12 @@ export default function App() {
 
   const handleConfirmarYEnviarWA = async () => {
     setCargando(true);
-    setMensaje(null);
 
     const canchaObj = canchas.find(c => c.id === canchaSeleccionada);
     const canchaNombre = canchaObj ? canchaObj.nombre : 'Cancha';
     const nombreFinal = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
     const telFinal = telefono.replace(/\D/g, '').trim();
 
-    // Mensaje en formato nativo limpio
     const textoMensaje = 
 `¡Hola ${club?.nombre || 'Padel Central'}! 👋
 Acabo de reservar un turno por la web:
@@ -368,17 +376,17 @@ Acabo de reservar un turno por la web:
       });
 
       setMostrarModalConfirmacionWA(false);
-      setMensaje({ tipo: 'exito', texto: '¡Turno reservado! Redirigiendo a WhatsApp...' });
+      setMensaje({ tipo: 'exito', texto: '¡Turno reservado con éxito! Nos vemos en la cancha.' });
       cargarSlots();
       setNombre('');
       setTelefono('');
       setSlotSeleccionado(null);
 
-      // Redirección directa nativa
-      window.location.assign(urlWhatsApp);
+      // Abre WhatsApp en pestaña/app nativa sin perder la web
+      window.open(urlWhatsApp, '_blank');
     } catch (err) {
       setMostrarModalConfirmacionWA(false);
-      setMensaje({ tipo: 'error', texto: err.response?.data || 'Error al reservar el turno' });
+      setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al reservar el turno' });
     } finally {
       setCargando(false);
     }
@@ -1188,13 +1196,25 @@ Acabo de reservar un turno por la web:
             ) : (
               <>
                 {mensaje && (
-                  <div className={`p-4 sm:p-6 rounded-3xl border backdrop-blur-md shadow-2xl flex items-center gap-3 ${
+                  <div className={`p-4 sm:p-5 rounded-3xl border backdrop-blur-md shadow-2xl flex items-center justify-between gap-3 ${
                     mensaje.tipo === 'exito' 
-                      ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-200' 
-                      : 'bg-rose-950/70 border-rose-800 text-rose-300'
+                      ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200' 
+                      : 'bg-rose-950/80 border-rose-800 text-rose-300'
                   }`}>
-                    {mensaje.tipo === 'exito' ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-emerald-400" /> : <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-rose-400" />}
-                    <p className="text-xs sm:text-sm font-bold text-white">{mensaje.texto}</p>
+                    <div className="flex items-center gap-3">
+                      {mensaje.tipo === 'exito' ? (
+                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-emerald-400" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-rose-400" />
+                      )}
+                      <p className="text-xs sm:text-sm font-bold text-white leading-snug">{mensaje.texto}</p>
+                    </div>
+                    <button
+                      onClick={() => setMensaje(null)}
+                      className="text-zinc-400 hover:text-white p-1 rounded-lg transition flex-shrink-0 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
 
