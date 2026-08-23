@@ -334,7 +334,7 @@ export default function App() {
 `¡Hola ${club?.nombre || 'Padel Central'}! 👋
 Acabo de reservar un turno por la web:
 
-🎾 *Pista:* ${canchaNombre}
+🎾 *Cancha:* ${canchaNombre}
 📅 *Fecha:* ${fecha}
 ⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs
 👤 *Jugador:* ${nombreFinal}
