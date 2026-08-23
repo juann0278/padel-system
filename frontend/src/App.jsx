@@ -633,7 +633,7 @@ Acabo de reservar un turno por la web:
 
               <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-left space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-zinc-500 font-medium">Pista:</span>
+                  <span className="text-zinc-500 font-medium">Cancha:</span>
                   <span className="text-emerald-400 font-bold">{canchaActualObj?.nombre || 'Cancha'}</span>
                 </div>
                 <div className="flex justify-between">
