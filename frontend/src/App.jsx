@@ -1255,7 +1255,7 @@ Acabo de reservar un turno por la web:
 
                 {/* Selector Canchas */}
                 <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">2. Seleccioná la pista</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">2. Seleccioná la cancha</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                     {canchas.map(c => {
                       const isSelected = canchaSeleccionada === c.id;
