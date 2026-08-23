@@ -23,8 +23,8 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // 1. Borramos todas las reservas de prueba anteriores
-          reservaRepository.deleteAll();
-          System.out.println(">>> ¡Todas las reservas de prueba fueron eliminadas!");
+        //  reservaRepository.deleteAll();
+        //  System.out.println(">>> ¡Todas las reservas de prueba fueron eliminadas!");
 
         // 2. Aseguramos el club y sus canchas limpias
         clubRepository.findBySlugAndActivoTrue("padel-central").ifPresentOrElse(club -> {
