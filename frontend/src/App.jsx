@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { 
   Clock, 
@@ -28,7 +28,7 @@ import {
 
 import FONDO from './assets/FONDO.jpg.avif';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.1.41:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.1.36:8080/api/v1';
 const CLUB_SLUG = 'padel-central';
 
 const MINUTOS_APERTURA = 8 * 60;          // 08:00 hs
@@ -169,6 +169,17 @@ export default function App() {
 
   // Modal de confirmación obligatoria WhatsApp
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
+
+  // Referencia para scroll automático al seleccionar horario
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    if (slotSeleccionado && formRef.current) {
+      setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [slotSeleccionado]);
 
   // Auto-limpiar el cartel a los 30 segundos si no lo cierran
   useEffect(() => {
@@ -1318,7 +1329,11 @@ Acabo de reservar un turno por la web:
 
                 {/* Formulario de Confirmación */}
                 {slotSeleccionado && (
-                  <form onSubmit={handlePreReservar} className="bg-zinc-900/90 border border-emerald-500/40 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-2xl backdrop-blur-md">
+                  <form 
+                    ref={formRef}
+                    onSubmit={handlePreReservar} 
+                    className="bg-zinc-900/90 border border-emerald-500/40 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-2xl backdrop-blur-md"
+                  >
                     <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                       <div>
                         <h3 className="font-extrabold text-white text-sm sm:text-base">Completá tus datos para jugar</h3>
