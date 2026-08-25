@@ -73,4 +73,10 @@ public class ReservaController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @PatchMapping("/{id}/cancelar-cadena")
+    public ResponseEntity<Void> cancelarCadena(@PathVariable Long id) {
+        reservaService.cancelarCadenaTurnosFijos(id);
+        return ResponseEntity.ok().build();
+    }
 }

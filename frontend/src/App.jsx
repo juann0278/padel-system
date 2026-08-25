@@ -151,7 +151,6 @@ export default function App() {
   const [adminNombre, setAdminNombre] = useState('');
   const [adminTelefono, setAdminTelefono] = useState('');
   const [adminEsFijo, setAdminEsFijo] = useState(false);
-  const [adminSemanas, setAdminSemanas] = useState(4);
   const [adminError, setAdminError] = useState('');
   const [adminCanchaFijada, setAdminCanchaFijada] = useState(false);
 
@@ -396,12 +395,22 @@ Acabo de reservar un turno por la web:
   };
 
   const handleCancelarReserva = async (id) => {
-    if (!confirm('¿Seguro que deseas liberar este turno / bloqueo?')) return;
+    if (!confirm('¿Seguro que deseas cancelar este turno puntual?')) return;
     try {
       await axios.patch(`${API_BASE}/reservas/${id}/cancelar`);
       cargarReservasAdmin();
     } catch {
-      alert('Error al liberar el turno');
+      alert('Error al cancelar el turno');
+    }
+  };
+
+  const handleCancelarCadena = async (id) => {
+    if (!confirm('¿El cliente no viene más? Esto desfijará TODOS los turnos futuros de este horario fijo.')) return;
+    try {
+      await axios.patch(`${API_BASE}/reservas/${id}/cancelar-cadena`);
+      cargarReservasAdmin();
+    } catch {
+      alert('Error al desfijar el turno');
     }
   };
 
@@ -421,7 +430,7 @@ Acabo de reservar un turno por la web:
           horaInicio: horaFormateada,
           nombreCliente: nombreAdminFinal,
           telefonoCliente: telefonoFinal,
-          semanas: Number(adminSemanas)
+          semanas: 52
         });
       } else {
         await axios.post(`${API_BASE}/reservas`, {
@@ -767,7 +776,7 @@ Acabo de reservar un turno por la web:
                   />
                 </div>
 
-                <div className="bg-zinc-950/80 border border-zinc-800 p-3.5 rounded-2xl space-y-2.5">
+                <div className="bg-zinc-950/80 border border-zinc-800 p-3.5 rounded-2xl space-y-2">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
                       type="checkbox"
@@ -776,23 +785,13 @@ Acabo de reservar un turno por la web:
                       className="w-4 h-4 rounded border-zinc-700 text-emerald-500 focus:ring-emerald-500 bg-zinc-900"
                     />
                     <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                      <Repeat className="w-3.5 h-3.5" /> ¿Repetir como Turno Fijo Semanal?
+                      <Repeat className="w-3.5 h-3.5" /> Turno Fijo
                     </span>
                   </label>
-
                   {adminEsFijo && (
-                    <div className="pt-2 border-t border-zinc-800 space-y-1.5">
-                      <label className="block text-[11px] text-zinc-400 font-medium">Duración:</label>
-                      <select
-                        value={adminSemanas}
-                        onChange={(e) => setAdminSemanas(e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-100 text-base sm:text-xs focus:outline-none focus:border-emerald-500 appearance-none"
-                      >
-                        <option value={4}>4 semanas (1 mes hacia adelante)</option>
-                        <option value={8}>8 semanas (2 meses hacia adelante)</option>
-                        <option value={12}>12 semanas (3 meses hacia adelante)</option>
-                      </select>
-                    </div>
+                    <p className="text-[11px] text-zinc-400 pl-6 leading-snug">
+                      Se repetirá automáticamente todas las semanas de forma indefinida hasta que se libere manualmente.
+                    </p>
                   )}
                 </div>
 
@@ -1097,11 +1096,12 @@ Acabo de reservar un turno por la web:
                       cancha.reservas.map((reserva) => {
                         const esBloqueado = reserva.estado === 'BLOQUEADO';
                         const esCancelado = reserva.estado === 'CANCELADO';
+                        const esFijo = reserva.nombreCliente?.includes('(Fijo)');
 
                         return (
                           <div
                             key={reserva.id}
-                            className={`p-3 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                            className={`p-3.5 rounded-2xl border transition flex flex-col gap-3 ${
                               esBloqueado
                                 ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
                                 : esCancelado
@@ -1109,10 +1109,11 @@ Acabo de reservar un turno por la web:
                                 : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
                             }`}
                           >
-                            <div className="space-y-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-black text-xs sm:text-sm text-white flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                            {/* Fila superior: Horario, Estado y Botones de acción */}
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-xs sm:text-sm text-white flex items-center gap-1.5">
+                                  <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                                   {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
                                 </span>
                                 
@@ -1127,26 +1128,40 @@ Acabo de reservar un turno por la web:
                                 </span>
                               </div>
 
-                              <div className="text-xs flex items-center gap-2 text-zinc-300">
-                                <span className="font-semibold truncate max-w-[180px]">
-                                  {reserva.nombreCliente || 'Sin nombre'}
-                                </span>
-                                {reserva.telefonoCliente && (
-                                  <span className="text-zinc-500 text-[11px] truncate">
-                                    • {reserva.telefonoCliente}
-                                  </span>
-                                )}
-                              </div>
+                              {reserva.estado !== 'CANCELADO' && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <button
+                                    onClick={() => handleCancelarReserva(reserva.id)}
+                                    className="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+                                    title={esBloqueado ? 'Desbloquear' : 'Cancela únicamente este turno puntual'}
+                                  >
+                                    {esBloqueado ? 'Desbloquear' : 'Cancelar'}
+                                  </button>
+
+                                  {esFijo && (
+                                    <button
+                                      onClick={() => handleCancelarCadena(reserva.id)}
+                                      className="text-[11px] bg-rose-900/40 hover:bg-rose-900/70 text-rose-300 border border-rose-700/50 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+                                      title="Desfija y cancela todos los turnos futuros de este horario"
+                                    >
+                                      Desfijar Turno
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
 
-                            {reserva.estado !== 'CANCELADO' && (
-                              <button
-                                onClick={() => handleCancelarReserva(reserva.id)}
-                                className="self-end sm:self-center text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer flex-shrink-0"
-                              >
-                                {esBloqueado ? 'Desbloquear' : 'Liberar'}
-                              </button>
-                            )}
+                            {/* Fila inferior: Datos del Cliente / Grupo */}
+                            <div className="text-xs flex items-center gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2">
+                              <span className="font-semibold truncate">
+                                {reserva.nombreCliente || 'Sin nombre'}
+                              </span>
+                              {reserva.telefonoCliente && (
+                                <span className="text-zinc-500 text-[11px] truncate">
+                                  • {reserva.telefonoCliente}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })

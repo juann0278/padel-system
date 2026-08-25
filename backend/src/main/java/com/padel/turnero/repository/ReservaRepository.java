@@ -23,9 +23,13 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
 
     Optional<Reserva> findByCanchaIdAndFechaAndHoraInicio(Long canchaId, LocalDate fecha, LocalTime horaInicio);
 
+
     boolean existsByCanchaIdAndFechaAndHoraInicioAndEstadoNot(
             Long canchaId, LocalDate fecha, LocalTime horaInicio, EstadoReserva estado
     );
+
+    @Query("SELECT r FROM Reserva r WHERE r.cancha.id = :canchaId AND r.horaInicio = :horaInicio AND r.fecha >= :fechaActual AND r.nombreCliente = :nombreCliente AND r.estado != 'CANCELADO'")
+    List<Reserva> buscarTurnosFuturosFijos(Long canchaId, LocalTime horaInicio, LocalDate fechaActual, String nombreCliente);
 
     @Query("SELECT COUNT(r) > 0 FROM Reserva r WHERE r.cancha.id = :canchaId " +
             "AND r.fecha = :fecha AND r.estado != :estadoCancelado " +

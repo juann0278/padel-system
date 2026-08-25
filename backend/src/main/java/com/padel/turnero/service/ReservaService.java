@@ -117,7 +117,8 @@ public class ReservaService {
                 ? LocalTime.of(23, 59, 59)
                 : dto.getHoraInicio().plusMinutes(90);
 
-        int semanas = dto.getSemanas() > 0 ? dto.getSemanas() : 4;
+        // Definimos un horizonte indefinido de 52 semanas (1 año) por defecto para los turnos fijos
+        int semanas = 52;
 
         for (int i = 0; i < semanas; i++) {
             LocalDate fechaTurno = dto.getFechaInicio().plusWeeks(i);
@@ -242,6 +243,27 @@ public class ReservaService {
                     reservaRepository.save(bloqueo);
                 }
             }
+        }
+    }
+
+    @Transactional
+    public void cancelarCadenaTurnosFijos(Long reservaId) {
+        Reserva reservaBase = reservaRepository.findById(reservaId)
+                .orElseThrow(() -> new RuntimeException("Reserva no encontrada"));
+
+        // Usamos exactamente el nombre que tiene la reserva seleccionada (ej: "Juan Pérez (Fijo)")
+        String nombreExacto = reservaBase.getNombreCliente();
+
+        List<Reserva> turnosFuturos = reservaRepository.buscarTurnosFuturosFijos(
+                reservaBase.getCancha().getId(),
+                reservaBase.getHoraInicio(),
+                reservaBase.getFecha(),
+                nombreExacto
+        );
+
+        for (Reserva r : turnosFuturos) {
+            r.setEstado(EstadoReserva.CANCELADO);
+            reservaRepository.save(r);
         }
     }
 }
