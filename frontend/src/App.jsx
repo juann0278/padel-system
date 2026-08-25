@@ -1079,24 +1079,24 @@ Acabo de reservar un turno por la web:
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                {/* Selector de fecha con el día formateado */}
-                <div className="flex items-center gap-2.5 flex-wrap">
+                {/* Selector de fecha unificado con el día formateado */}
+                <div className="flex items-center gap-2.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Fecha de planilla:
                   </label>
                   
-                  <input
-                    type="date"
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                    className="bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 rounded-2xl px-3.5 py-2 text-zinc-100 text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500 transition cursor-pointer"
-                  />
-
-                  {fecha && (
-                    <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-xs">
-                      {formatearFechaConDia(fecha)}
-                    </span>
-                  )}
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={fecha}
+                      onChange={(e) => setFecha(e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    />
+                    <div className="bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 rounded-2xl px-4 py-2 text-emerald-400 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-inner">
+                      <Calendar className="w-4 h-4 text-emerald-400" />
+                      <span>{formatearFechaConDia(fecha)}</span>
+                    </div>
+                  </div>
                 </div>
 
                 <button
@@ -1222,8 +1222,8 @@ Acabo de reservar un turno por la web:
                                       Desfijar Turno
                                     </button>
                                   )}
-                              </div>
-                            )}
+                                </div>
+                              )}
                             </div>
 
                             {/* Fila inferior: Datos del Cliente / Grupo y Botón Ver Comprobante */}
@@ -1250,8 +1250,8 @@ Acabo de reservar un turno por la web:
                                   <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
                                 </button>
                               )}
+                            </div>
                           </div>
-                        </div>
                         );
                       })
                     )}
