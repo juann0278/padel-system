@@ -35,17 +35,24 @@ public class DataInitializer implements CommandLineRunner {
             return clubRepository.save(nuevoClub);
         });
 
-        // 2. Si no hay canchas registradas en la base, inicializa las 4 oficiales con $40.000
-        if (canchaRepository.count() == 0) {
-            Cancha c1 = Cancha.builder().club(club).nombre("Cancha 1").tipo("Material").precioBase(new BigDecimal("40000.00")).build();
-            Cancha c2 = Cancha.builder().club(club).nombre("Cancha 2").tipo("Blindex").precioBase(new BigDecimal("40000.00")).build();
-            Cancha c3 = Cancha.builder().club(club).nombre("Cancha 3 (Miguel Medei)").tipo("Blindex").precioBase(new BigDecimal("40000.00")).build();
-            Cancha c4 = Cancha.builder().club(club).nombre("Cancha 4 (Nicolas Arce)").tipo("Blindex").precioBase(new BigDecimal("40000.00")).build();
+        // 2. Asegurar que existan las 4 canchas oficiales o agregarlas si falta alguna
+        List<String> canchasEsperadas = List.of("Cancha 1", "Cancha 2", "Cancha 3 (Miguel Medei)", "Cancha 4 (Nicolas Arce)");
 
-            canchaRepository.saveAll(List.of(c1, c2, c3, c4));
-            System.out.println(">>> [DataInitializer] Seed inicial completado: 4 canchas creadas con $40.000.");
-        } else {
-            System.out.println(">>> [DataInitializer] Canchas ya existentes (" + canchaRepository.count() + "). No se realizaron cambios.");
+        for (String nombreCancha : canchasEsperadas) {
+            boolean existe = canchaRepository.findAll().stream()
+                    .anyMatch(c -> c.getNombre().equalsIgnoreCase(nombreCancha));
+            if (!existe) {
+                Cancha nuevaCancha = Cancha.builder()
+                        .club(club)
+                        .nombre(nombreCancha)
+                        .tipo(nombreCancha.contains("Cancha 1") ? "Material" : "Blindex")
+                        .precioBase(new BigDecimal("40000.00"))
+                        .build();
+                canchaRepository.save(nuevaCancha);
+                System.out.println(">>> [DataInitializer] Cancha agregada: " + nombreCancha);
+            }
         }
+
+        System.out.println(">>> [DataInitializer] Verificación de canchas completada. Total en BD: " + canchaRepository.count());
     }
 }
