@@ -552,19 +552,20 @@ Acabo de reservar un turno por la web:
       <div className="relative z-10 p-3 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
         
         {/* Barra superior */}
-        <header className="flex items-center justify-between bg-zinc-900/95 border border-zinc-800 p-4 sm:p-5 rounded-3xl shadow-xl">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 sm:p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-emerald-400 flex-shrink-0">
+        <header className="flex items-start justify-between bg-zinc-900/95 border border-zinc-800 p-4 sm:p-5 rounded-3xl shadow-xl gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="p-2.5 sm:p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-emerald-400 flex-shrink-0 mt-0.5">
               <Trophy className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-2xl font-black tracking-tight text-white truncate leading-tight">
                 {club.nombre}
               </h1>
               
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-[11px] sm:text-xs text-zinc-400 flex items-center gap-1 truncate">
-                  <MapPin className="w-3 h-3 text-zinc-500 flex-shrink-0" /> {club.direccion}
+              <div className="flex items-start gap-1.5 mt-1">
+                <MapPin className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0 mt-0.5" /> 
+                <span className="text-[11px] sm:text-xs text-zinc-400 leading-snug break-words">
+                  {club.direccion}
                 </span>
               </div>
             </div>
