@@ -24,35 +24,28 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        // 1. Borramos limpiamente usando JPA en el orden correcto para evitar violates foreign key
-        try {
-            reservaRepository.deleteAllInBatch();
-            canchaRepository.deleteAllInBatch();
-            clubRepository.deleteAllInBatch();
-            System.out.println(">>> [DataInitializer] ¡Base de datos limpiada por completo vía JPA!");
-        } catch (Exception e) {
-            System.out.println(">>> [DataInitializer] Error al limpiar tablas: " + e.getMessage());
+        // 1. Buscamos el club oficial; si no existe en la base de datos de Render, lo creamos.
+        Club club = clubRepository.findBySlugAndActivoTrue("padel-central").orElseGet(() -> {
+            Club nuevoClub = Club.builder()
+                    .nombre("Murcielago Padel")
+                    .slug("padel-central")
+                    .telefono("2494641010")
+                    .adminPin("lovepadel")
+                    .direccion("Muñoz 730 Ayacucho Pcia De Buenos Aires")
+                    .activo(true)
+                    .build();
+            return clubRepository.save(nuevoClub);
+        });
+
+        // 2. Si todavía no hay canchas cargadas, creamos las 4 oficiales asociadas al club
+        if (canchaRepository.count() == 0) {
+            Cancha c1 = Cancha.builder().club(club).nombre("Cancha 1").tipo("Material").precioBase(new BigDecimal("50.00")).build();
+            Cancha c2 = Cancha.builder().club(club).nombre("Cancha 2").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
+            Cancha c3 = Cancha.builder().club(club).nombre("Cancha 3 (Miguel Medei)").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
+            Cancha c4 = Cancha.builder().club(club).nombre("Cancha 4 (Nicolas Arce)").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
+
+            canchaRepository.saveAll(List.of(c1, c2, c3, c4));
+            System.out.println(">>> [DataInitializer] ¡Canchas oficiales inicializadas correctamente!");
         }
-
-        // 2. Creamos el Club oficial de cero
-        Club club = Club.builder()
-                .nombre("Murcielago Padel")
-                .slug("padel-central")
-                .telefono("2494641010")
-                .adminPin("lovepadel")
-                .direccion("Muñoz 730 Ayacucho Pcia De Buenos Aires")
-                .activo(true)
-                .build();
-
-        club = clubRepository.save(club);
-
-        // 3. Creamos las 4 canchas oficiales asociadas a este club
-        Cancha c1 = Cancha.builder().club(club).nombre("Cancha 1").tipo("Material").precioBase(new BigDecimal("50.00")).build();
-        Cancha c2 = Cancha.builder().club(club).nombre("Cancha 2").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
-        Cancha c3 = Cancha.builder().club(club).nombre("Cancha 3 (Miguel Medei)").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
-        Cancha c4 = Cancha.builder().club(club).nombre("Cancha 4 (Nicolas Arce)").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
-
-        canchaRepository.saveAll(List.of(c1, c2, c3, c4));
-        System.out.println(">>> [DataInitializer] ¡Base de datos inicializada correctamente!");
     }
 }
