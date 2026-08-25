@@ -920,7 +920,7 @@ Acabo de reservar un turno por la web:
                   <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                     Rango de Horarios:
                   </label>
-                  
+                   
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     <button
                       type="button"
@@ -1063,7 +1063,7 @@ Acabo de reservar un turno por la web:
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Fecha de planilla:
                   </label>
-                  
+                   
                   <div className="relative inline-flex items-center">
                     <span className="bg-zinc-950 border border-zinc-800 rounded-2xl px-3.5 py-1.5 text-zinc-100 text-xs sm:text-sm font-bold flex items-center gap-2 pointer-events-none">
                       {formatearFechaConDia(fecha)}
@@ -1169,7 +1169,7 @@ Acabo de reservar un turno por la web:
                                   <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                                   {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
                                 </span>
-                                
+                                 
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
                                   esBloqueado
                                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
@@ -1219,7 +1219,10 @@ Acabo de reservar un turno por la web:
 
                               {reserva.comprobanteImagen && (
                                 <button
-                                  onClick={() => setImagenModalUrl(`http://localhost:8080/uploads/${reserva.comprobanteImagen}`)}
+                                  onClick={() => {
+                                    const baseURLSinApi = API_BASE.replace('/api/v1', '');
+                                    setImagenModalUrl(`${baseURLSinApi}/uploads/${reserva.comprobanteImagen}`);
+                                  }}
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer ml-auto"
                                 >
                                   <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
@@ -1266,7 +1269,7 @@ Acabo de reservar un turno por la web:
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-400" /> 1. Elegí el día de tu partido
               </label>
-              
+               
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 sm:gap-2">
                 {proximosDias.map((d) => {
                   const isSelected = fecha === d.fechaISO;
@@ -1329,7 +1332,7 @@ Acabo de reservar un turno por la web:
                 </h2>
                 <span className="text-[11px] sm:text-xs text-zinc-400 font-medium">Turnos estándar</span>
               </div>
-              
+               
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                 {slots.map((slot, idx) => {
                   const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
@@ -1374,7 +1377,7 @@ Acabo de reservar un turno por la web:
                   <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Shield className="w-4 h-4" /> Datos de pago por transferencia
                   </p>
-                  
+                   
                   <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-zinc-500 block">ALIAS BANCARIO</span>
@@ -1432,7 +1435,7 @@ Acabo de reservar un turno por la web:
                   <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
                     Adjuntar Captura del Comprobante (Mercado Pago / Cuenta DNI) *
                   </label>
-                  
+                   
                   <div className="relative">
                     {!comprobanteArchivo ? (
                       <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-emerald-500/40 rounded-2xl bg-zinc-950/80 hover:bg-zinc-950 hover:border-emerald-400 transition cursor-pointer group">
