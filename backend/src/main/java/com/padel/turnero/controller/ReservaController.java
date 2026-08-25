@@ -5,6 +5,7 @@ import com.padel.turnero.dto.CrearReservaDTO;
 import com.padel.turnero.dto.CrearReservaFijaDTO;
 import com.padel.turnero.dto.SlotHorarioDTO;
 import com.padel.turnero.model.Reserva;
+import com.padel.turnero.repository.ReservaRepository;
 import com.padel.turnero.service.ReservaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import java.util.List;
 public class ReservaController {
 
     private final ReservaService reservaService;
+    private final ReservaRepository reservaRepository;
 
     @GetMapping("/disponibilidad")
     public ResponseEntity<List<SlotHorarioDTO>> obtenerDisponibilidad(
@@ -73,6 +75,12 @@ public class ReservaController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @DeleteMapping("/admin/reset-demo")
+    public ResponseEntity<String> resetDemo() {
+        reservaRepository.deleteAllInBatch();
+        return ResponseEntity.ok("¡Sistema limpiado con éxito en la nube!");
     }
 
     @PutMapping("/{id}/confirmar-pago")

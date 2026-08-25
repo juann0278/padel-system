@@ -5,6 +5,7 @@ import com.padel.turnero.model.Club;
 import com.padel.turnero.repository.CanchaRepository;
 import com.padel.turnero.repository.ClubRepository;
 import com.padel.turnero.repository.ReservaRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ClubRepository clubRepository;
     private final CanchaRepository canchaRepository;
     private final ReservaRepository reservaRepository;
+    private final EntityManager entityManager;
 
     @Override
     @Transactional
@@ -37,18 +39,17 @@ public class DataInitializer implements CommandLineRunner {
             return clubRepository.save(nuevoClub);
         });
 
-        // Actualizamos por si ya existía con datos viejos
         club.setNombre("Murcielago Padel");
         club.setDireccion("Muñoz 730 Ayacucho Pcia De Buenos Aires");
         club.setTelefono("2494641010");
         clubRepository.save(club);
 
-        // 2. Limpiamos reservas y canchas viejas duplicadas para pruebas
+        // 2. Limpieza radical por SQL nativo para vaciar reservas y canchas sin trabas
         try {
-            reservaRepository.deleteAll();
-            canchaRepository.deleteAll();
+            entityManager.createNativeQuery("TRUNCATE TABLE reservas, canchas, clubes CASCADE;").executeUpdate();
+            System.out.println(">>> [DataInitializer] ¡BASE DE DATOS PURGADA POR COMPLETO!");
         } catch (Exception e) {
-            System.out.println(">>> [DataInitializer] Nota al limpiar tablas: " + e.getMessage());
+            System.out.println(">>> [DataInitializer] Error al purgar: " + e.getMessage());
         }
 
         // 3. Creamos únicamente las 4 canchas oficiales y correctas
@@ -58,6 +59,6 @@ public class DataInitializer implements CommandLineRunner {
         Cancha c4 = Cancha.builder().club(club).nombre("Cancha 4 (Nicolas Arce)").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
 
         canchaRepository.saveAll(List.of(c1, c2, c3, c4));
-        System.out.println(">>> [DataInitializer] ¡Base de datos blanqueada con el club Murcielago Padel y las 4 canchas oficiales!");
+        System.out.println(">>> [DataInitializer] ¡Base de datos blanqueada por completo!");
     }
 }
