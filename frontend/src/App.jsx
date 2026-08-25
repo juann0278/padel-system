@@ -23,7 +23,8 @@ import {
   Eye, 
   EyeOff, 
   RefreshCw, 
-  Info 
+  Info,
+  Image as ImageIcon
 } from 'lucide-react';
 
 import FONDO from './assets/FONDO.jpg.avif';
@@ -143,6 +144,9 @@ export default function App() {
   const [reservasAdmin, setReservasAdmin] = useState([]);
   const [ocultarCancelados, setOcultarCancelados] = useState(true);
 
+  // Modal para ver imagen de comprobante (Admin)
+  const [imagenModalUrl, setImagenModalUrl] = useState(null);
+
   // Modales
   const [mostrarModalCrearAdmin, setMostrarModalCrearAdmin] = useState(false);
   const [adminCanchaId, setAdminCanchaId] = useState('');
@@ -166,6 +170,7 @@ export default function App() {
   // Formulario cliente & éxito
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [comprobanteArchivo, setComprobanteArchivo] = useState(null);
   const [mensaje, setMensaje] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -210,7 +215,6 @@ export default function App() {
     return lista;
   }, []);
 
-  // Carga inicial con tiempo mínimo para apreciar la animación completa del loader
   useEffect(() => {
     const cargarDatos = async () => {
       try {
@@ -315,8 +319,8 @@ export default function App() {
     const nombreLimpio = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
     const telLimpio = telefono.replace(/\D/g, '').trim();
 
-    if (!slotSeleccionado || !nombreLimpio || !telLimpio) {
-      alert('Por favor, verificá tus datos ingresados.');
+    if (!slotSeleccionado || !nombreLimpio || !telLimpio || !comprobanteArchivo) {
+      alert('Por favor, completá todos los campos y adjuntá la captura del comprobante.');
       return;
     }
     setNombre(nombreLimpio);
@@ -333,7 +337,7 @@ export default function App() {
     const telFinal = telefono.replace(/\D/g, '').trim();
 
     const textoMensaje = 
-`¡Hola ${club?.nombre || 'Padel Central'}! 👋
+`¡Hola ${club?.nombre || 'Murcielago Padel'}! 👋
 Acabo de reservar un turno por la web:
 
 🎾 *Cancha:* ${canchaNombre}
@@ -341,8 +345,9 @@ Acabo de reservar un turno por la web:
 ⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs
 👤 *Jugador:* ${nombreFinal}
 📱 *Teléfono:* ${telFinal}
+🧾 *Comprobante:* Adjunto captura de pago
 
-¿Me confirman la reserva? ¡Muchas gracias! ✨`;
+¡Muchas gracias! ✨`;
 
     let num = (club?.telefono || '2494641010').replace(/\D/g, '');
     if (num.startsWith('0')) num = num.substring(1);
@@ -362,7 +367,7 @@ Acabo de reservar un turno por la web:
     const urlWhatsAppWeb = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${textoEncoded}`;
 
     try {
-      await axios.post(`${API_BASE}/reservas`, {
+      const resReserva = await axios.post(`${API_BASE}/reservas`, {
         canchaId: canchaSeleccionada,
         fecha,
         horaInicio: slotSeleccionado.horaInicio,
@@ -370,10 +375,24 @@ Acabo de reservar un turno por la web:
         telefonoCliente: telFinal
       });
 
-      setMensaje({ tipo: 'exito', texto: '¡Turno reservado con éxito! Nos vemos en la cancha.' });
+      const reservaId = resReserva.data?.id;
+      
+      if (reservaId && comprobanteArchivo) {
+        const formData = new FormData();
+        formData.append('file', comprobanteArchivo);
+
+        await axios.put(`${API_BASE}/reservas/${reservaId}/confirmar-pago`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+      }
+
+      setMensaje({ tipo: 'exito', texto: '¡Turno reservado y comprobante adjuntado con éxito! Nos vemos en la cancha.' });
       cargarSlots();
       setNombre('');
       setTelefono('');
+      setComprobanteArchivo(null);
       setSlotSeleccionado(null);
 
       const esMovil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -387,7 +406,7 @@ Acabo de reservar un turno por la web:
         setMostrarModalConfirmacionWA(false);
       }
     } catch (err) {
-      setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al reservar el turno' });
+      setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al procesar la reserva' });
       setMostrarModalConfirmacionWA(false);
     } finally {
       setCargando(false);
@@ -532,7 +551,7 @@ Acabo de reservar un turno por la web:
       <div className="relative z-10 p-3 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
         
         {/* Barra superior */}
-        <header className="flex items-center justify-between bg-zinc-900/80 border border-zinc-800 backdrop-blur-md p-4 sm:p-5 rounded-3xl shadow-xl">
+        <header className="flex items-center justify-between bg-zinc-900/95 border border-zinc-800 p-4 sm:p-5 rounded-3xl shadow-xl">
           <div className="flex items-center gap-3 min-w-0">
             <div className="p-2.5 sm:p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-emerald-400 flex-shrink-0">
               <Trophy className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -578,9 +597,43 @@ Acabo de reservar un turno por la web:
           </div>
         </header>
 
+        {/* Modal de Imagen / Comprobante (Admin) */}
+        {imagenModalUrl && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-zinc-900 border border-zinc-700 p-4 rounded-3xl max-w-lg w-full space-y-4 shadow-2xl text-center">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-emerald-400" /> Comprobante de Transferencia
+                </h3>
+                <button 
+                  onClick={() => setImagenModalUrl(null)}
+                  className="p-1 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-zinc-950 p-2 rounded-2xl border border-zinc-800 max-h-[70vh] flex items-center justify-center overflow-hidden">
+                <img 
+                  src={imagenModalUrl} 
+                  alt="Comprobante de pago" 
+                  className="max-h-[60vh] object-contain rounded-xl"
+                />
+              </div>
+
+              <button
+                onClick={() => setImagenModalUrl(null)}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold py-3 rounded-2xl text-xs transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Modal Login Admin */}
         {mostrarModalLogin && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400">
@@ -625,7 +678,7 @@ Acabo de reservar un turno por la web:
 
         {/* Modal Obligatorio WhatsApp */}
         {mostrarModalConfirmacionWA && slotSeleccionado && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-emerald-500/40 p-6 rounded-3xl max-w-md w-full space-y-5 shadow-2xl text-center">
               <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto">
                 <MessageCircle className="w-7 h-7 fill-current" />
@@ -665,7 +718,7 @@ Acabo de reservar un turno por la web:
                   className="w-full flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs uppercase tracking-wider py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 transition disabled:opacity-50 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 fill-current" />
-                  {cargando ? 'Abriendo WhatsApp...' : 'Enviar Confirmación por WhatsApp'}
+                  {cargando ? 'Registrando y abriendo WhatsApp...' : 'Enviar Confirmación por WhatsApp'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
@@ -685,7 +738,7 @@ Acabo de reservar un turno por la web:
 
         {/* Modal Crear Turno Admin */}
         {mostrarModalCrearAdmin && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-zinc-800 p-5 sm:p-6 rounded-3xl max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-base sm:text-lg">
@@ -817,7 +870,7 @@ Acabo de reservar un turno por la web:
 
         {/* Modal Bloqueo */}
         {mostrarModalBloqueo && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-zinc-800 p-5 sm:p-6 rounded-3xl max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-rose-400 font-bold text-base sm:text-lg">
@@ -967,7 +1020,7 @@ Acabo de reservar un turno por la web:
         {/* VISTA ADMIN */}
         {vistaAdmin && estaAutenticado ? (
           <main className="space-y-4 sm:space-y-6">
-            <div className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md p-4 sm:p-5 rounded-3xl shadow-xl space-y-4">
+            <div className="bg-zinc-900/95 border border-zinc-800 p-4 sm:p-5 rounded-3xl shadow-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3.5">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
@@ -1043,7 +1096,7 @@ Acabo de reservar un turno por la web:
               {canchasConReservas.map((cancha) => (
                 <section 
                   key={cancha.id}
-                  className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl flex flex-col justify-between"
+                  className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                     <div>
@@ -1151,15 +1204,26 @@ Acabo de reservar un turno por la web:
                               )}
                             </div>
 
-                            {/* Fila inferior: Datos del Cliente / Grupo */}
-                            <div className="text-xs flex items-center gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2">
-                              <span className="font-semibold truncate">
-                                {reserva.nombreCliente || 'Sin nombre'}
-                              </span>
-                              {reserva.telefonoCliente && (
-                                <span className="text-zinc-500 text-[11px] truncate">
-                                  • {reserva.telefonoCliente}
+                            {/* Fila inferior: Datos del Cliente / Grupo y Botón Ver Comprobante */}
+                            <div className="text-xs flex items-center justify-between gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2 flex-wrap">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span className="font-semibold truncate">
+                                  {reserva.nombreCliente || 'Sin nombre'}
                                 </span>
+                                {reserva.telefonoCliente && (
+                                  <span className="text-zinc-500 text-[11px] truncate">
+                                    • {reserva.telefonoCliente}
+                                  </span>
+                                )}
+                              </div>
+
+                              {reserva.comprobanteImagen && (
+                                <button
+                                  onClick={() => setImagenModalUrl(`http://localhost:8080/uploads/${reserva.comprobanteImagen}`)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer ml-auto"
+                                >
+                                  <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
+                                </button>
                               )}
                             </div>
                           </div>
@@ -1175,10 +1239,10 @@ Acabo de reservar un turno por la web:
           /* VISTA CLIENTE */
           <main className="space-y-4 sm:space-y-6">
             {mensaje && (
-              <div className={`p-4 sm:p-5 rounded-3xl border backdrop-blur-md shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${
+              <div className={`p-4 sm:p-5 rounded-3xl border shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${
                 mensaje.tipo === 'exito' 
-                  ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200' 
-                  : 'bg-rose-950/80 border-rose-800 text-rose-300'
+                  ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200' 
+                  : 'bg-rose-950/95 border-rose-800 text-rose-300'
               }`}>
                 <div className="flex items-center gap-3">
                   {mensaje.tipo === 'exito' ? (
@@ -1198,7 +1262,7 @@ Acabo de reservar un turno por la web:
             )}
 
             {/* Selector de Días Semanales (8 Días) */}
-            <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
+            <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-400" /> 1. Elegí el día de tu partido
               </label>
@@ -1231,8 +1295,8 @@ Acabo de reservar un turno por la web:
               </div>
             </section>
 
-            {/* Selector Canchas (4 Canchas Reales) */}
-            <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
+            {/* Selector Canchas */}
+            <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
               <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">2. Seleccioná la cancha</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                 {canchas.map(c => {
@@ -1251,11 +1315,6 @@ Acabo de reservar un turno por la web:
                         <p className="text-white font-bold text-sm sm:text-base">{c.nombre}</p>
                         <p className="text-xs text-zinc-400 mt-0.5">{c.tipo}</p>
                       </div>
-                      <div className="text-right">
-                        <span className="text-xs font-black px-2.5 py-1 rounded-xl bg-zinc-900 border border-zinc-800 text-emerald-400">
-                          ${c.precioBase}
-                        </span>
-                      </div>
                     </button>
                   );
                 })}
@@ -1263,7 +1322,7 @@ Acabo de reservar un turno por la web:
             </section>
 
             {/* Horarios */}
-            <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
+            <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> 3. Horarios Disponibles (90 min)
@@ -1294,20 +1353,48 @@ Acabo de reservar un turno por la web:
               </div>
             </section>
 
-            {/* Formulario de Confirmación */}
+            {/* Formulario de Confirmación con el Selector Moderno */}
             {slotSeleccionado && (
               <form 
                 ref={formRef}
                 onSubmit={handlePreReservar} 
-                className="bg-zinc-900/90 border border-emerald-500/40 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-2xl backdrop-blur-md"
+                className="bg-zinc-900/95 border border-emerald-500/40 rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl"
               >
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                   <div>
-                    <h3 className="font-extrabold text-white text-sm sm:text-base">Completá tus datos para jugar</h3>
+                    <h3 className="font-extrabold text-white text-sm sm:text-base">Datos para transferir y confirmar</h3>
                     <p className="text-xs text-emerald-400 font-semibold mt-0.5">
                       Turno seleccionado: {slotSeleccionado.horaInicio?.slice(0, 5)} hs
                     </p>
                   </div>
+                </div>
+
+                {/* 💳 DATOS DEL ALIAS Y MONTO EXACTO */}
+                <div className="bg-zinc-950/80 border border-emerald-500/30 rounded-2xl p-4 space-y-3">
+                  <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Shield className="w-4 h-4" /> Datos de pago por transferencia
+                  </p>
+                  
+                  <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-zinc-500 block">ALIAS BANCARIO</span>
+                      <span className="text-sm font-black text-white select-all">juan.45.mp</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-emerald-400 font-bold block">MONTO EXACTO</span>
+                      <span className="text-base font-black text-emerald-300">
+                        ${canchas.find(c => c.id === canchaSeleccionada)?.precioBase || '50'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-zinc-300">
+                    Realizá la transferencia por el monto exacto indicado arriba al alias provisto.
+                  </p>
+
+                  <p className="text-[11px] text-amber-400/90 font-medium">
+                    ⚠️ Recordá que las cancelaciones se realizan con al menos 12 hs de anticipación.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1340,11 +1427,74 @@ Acabo de reservar un turno por la web:
                   </div>
                 </div>
 
+                {/* 🧾 ADJUNTAR CAPTURA DE COMPROBANTE (SELECTOR FLAMA CON BOTÓN QUITAR) */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+                    Adjuntar Captura del Comprobante (Mercado Pago / Cuenta DNI) *
+                  </label>
+                  
+                  <div className="relative">
+                    {!comprobanteArchivo ? (
+                      <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-emerald-500/40 rounded-2xl bg-zinc-950/80 hover:bg-zinc-950 hover:border-emerald-400 transition cursor-pointer group">
+                        <div className="flex flex-col items-center justify-center pt-2 pb-3 px-4 text-center">
+                          <ImageIcon className="w-6 h-6 text-emerald-400 mb-1 group-hover:scale-110 transition-transform" />
+                          <p className="text-xs text-zinc-300 font-semibold">
+                            Hacé clic para seleccionar la captura
+                          </p>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">
+                            PNG, JPG o JPEG (El comprobante es obligatorio)
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          required
+                          accept="image/*"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setComprobanteArchivo(e.target.files[0]);
+                            }
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    ) : (
+                      <div className="flex items-center justify-between bg-zinc-950 border border-emerald-500/50 rounded-2xl p-3.5 shadow-inner">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 flex-shrink-0">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate">
+                              {comprobanteArchivo.name}
+                            </p>
+                            <p className="text-[10px] text-emerald-400 font-medium">
+                              Archivo listo para enviar
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setComprobanteArchivo(null)}
+                          title="Eliminar archivo"
+                          className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition cursor-pointer flex-shrink-0 flex items-center gap-1 text-xs font-bold"
+                        >
+                          <X className="w-4 h-4" />
+                          <span className="hidden sm:inline">Quitar</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-500 block">
+                    Subí la foto o captura del pago. El turno quedará confirmado al instante.
+                  </span>
+                </div>
+
                 <button
                   type="submit"
                   className="w-full bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 px-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition mt-2 cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <span>Continuar con la Reserva</span>
+                  <span>Continuar y Confirmar Turno</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
