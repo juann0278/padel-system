@@ -1033,7 +1033,25 @@ Acabo de reservar un turno por la web:
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* BOTÓN PARA LIMPIAR DEMO EN LA NUBE */}
+                  <button
+                    onClick={async () => {
+                      if (confirm('¿Querés borrar todas las reservas de la base de datos de producción?')) {
+                        try {
+                          await axios.delete(`${API_BASE}/reservas/admin/reset-demo`);
+                          alert('¡Base limpiada con éxito!');
+                          window.location.reload();
+                        } catch (err) {
+                          alert('Error al limpiar la base');
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold text-xs rounded-2xl transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    🧹 Limpiar Demo
+                  </button>
+
                   <button
                     onClick={() => {
                       setBloqueoError('');
