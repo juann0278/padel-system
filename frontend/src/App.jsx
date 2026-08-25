@@ -365,7 +365,6 @@ Acabo de reservar un turno por la web:
     }
 
     const textoEncoded = encodeURIComponent(textoMensaje);
-    const schemeWhatsAppMobile = `whatsapp://send?phone=${telefonoDestino}&text=${textoEncoded}`;
     const urlWhatsAppWeb = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${textoEncoded}`;
 
     try {
@@ -390,23 +389,16 @@ Acabo de reservar un turno por la web:
         });
       }
 
-      setMensaje({ tipo: 'exito', texto: '¡Turno reservado y comprobante adjuntado con éxito! Nos vemos en la cancha.' });
+      setMensaje({ tipo: 'exito', texto: '¡Turno reservado y comprobante adjuntado con éxito! Abriendo WhatsApp...' });
       cargarSlots();
       setNombre('');
       setTelefono('');
       setComprobanteArchivo(null);
       setSlotSeleccionado(null);
 
-      const esMovil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      if (esMovil) {
-        window.location.href = schemeWhatsAppMobile;
-        setTimeout(() => {
-          setMostrarModalConfirmacionWA(false);
-        }, 600);
-      } else {
-        window.open(urlWhatsAppWeb, '_blank');
-        setMostrarModalConfirmacionWA(false);
-      }
+      setMostrarModalConfirmacionWA(false);
+      window.open(urlWhatsAppWeb, '_blank');
+
     } catch (err) {
       setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al procesar la reserva' });
       setMostrarModalConfirmacionWA(false);
