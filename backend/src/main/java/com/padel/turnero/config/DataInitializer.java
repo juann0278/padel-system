@@ -19,12 +19,12 @@ public class DataInitializer implements CommandLineRunner {
 
     private final ClubRepository clubRepository;
     private final CanchaRepository canchaRepository;
-    private final ReservaRepository reservaRepository; // Inyectamos esto para limpiar reservas viejas si las hubiera
+    private final ReservaRepository reservaRepository;
 
     @Override
     @Transactional
     public void run(String... args) {
-        // 1. Obtener o crear el Club de forma no destructiva
+        // 1. Obtener o crear el Club y asegurar los datos oficiales correctos
         Club club = clubRepository.findBySlugAndActivoTrue("padel-central").orElseGet(() -> {
             Club nuevoClub = Club.builder()
                     .nombre("Murcielago Padel")
@@ -37,10 +37,16 @@ public class DataInitializer implements CommandLineRunner {
             return clubRepository.save(nuevoClub);
         });
 
-        // 2. Como estamos en entorno de prueba, limpiamos reservas y canchas viejas duplicadas
+        // Actualizamos por si ya existía con datos viejos
+        club.setNombre("Murcielago Padel");
+        club.setDireccion("Muñoz 730 Ayacucho Pcia De Buenos Aires");
+        club.setTelefono("2494641010");
+        clubRepository.save(club);
+
+        // 2. Limpiamos reservas y canchas viejas duplicadas para pruebas
         try {
-            reservaRepository.deleteAll(); // Borra turnos viejos de prueba para que no rompa la relación
-            canchaRepository.deleteAll();  // Borra todas las canchas viejas
+            reservaRepository.deleteAll();
+            canchaRepository.deleteAll();
         } catch (Exception e) {
             System.out.println(">>> [DataInitializer] Nota al limpiar tablas: " + e.getMessage());
         }
@@ -52,6 +58,6 @@ public class DataInitializer implements CommandLineRunner {
         Cancha c4 = Cancha.builder().club(club).nombre("Cancha 4 (Nicolas Arce)").tipo("Blindex").precioBase(new BigDecimal("40000.00")).build();
 
         canchaRepository.saveAll(List.of(c1, c2, c3, c4));
-        System.out.println(">>> [DataInitializer] ¡Base de datos blanqueada y reiniciada con las 4 canchas oficiales!");
+        System.out.println(">>> [DataInitializer] ¡Base de datos blanqueada con el club Murcielago Padel y las 4 canchas oficiales!");
     }
 }
