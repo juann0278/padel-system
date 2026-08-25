@@ -178,6 +178,7 @@ export default function App() {
   const [errorCarga, setErrorCarga] = useState(null);
 
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
+  const [urlWhatsAppLista, setUrlWhatsAppLista] = useState(null);
   const formRef = useRef(null);
 
   useEffect(() => {
@@ -327,6 +328,7 @@ export default function App() {
     }
     setNombre(nombreLimpio);
     setTelefono(telLimpio);
+    setUrlWhatsAppLista(null);
     setMostrarModalConfirmacionWA(true);
   };
 
@@ -389,15 +391,15 @@ Acabo de reservar un turno por la web:
         });
       }
 
-      setMensaje({ tipo: 'exito', texto: '¡Turno reservado y comprobante adjuntado con éxito! Abriendo WhatsApp...' });
+      setMensaje({ tipo: 'exito', texto: '¡Turno reservado y comprobante adjuntado con éxito! Tocá el botón para abrir WhatsApp.' });
       cargarSlots();
       setNombre('');
       setTelefono('');
       setComprobanteArchivo(null);
       setSlotSeleccionado(null);
 
-      setMostrarModalConfirmacionWA(false);
-      window.open(urlWhatsAppWeb, '_blank');
+      // Guardamos la URL para transformar el botón del modal en enlace directo seguro
+      setUrlWhatsAppLista(urlWhatsAppWeb);
 
     } catch (err) {
       setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al procesar la reserva' });
@@ -705,18 +707,35 @@ Acabo de reservar un turno por la web:
               </div>
 
               <div className="space-y-2.5 pt-1">
-                <button
-                  type="button"
-                  disabled={cargando}
-                  onClick={handleConfirmarYEnviarWA}
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs uppercase tracking-wider py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 transition disabled:opacity-50 cursor-pointer"
-                >
-                  <MessageCircle className="w-4 h-4 fill-current" />
-                  {cargando ? 'Registrando y abriendo WhatsApp...' : 'Enviar Confirmación por WhatsApp'}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                {!urlWhatsAppLista ? (
+                  <button
+                    type="button"
+                    disabled={cargando}
+                    onClick={handleConfirmarYEnviarWA}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs uppercase tracking-wider py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 transition disabled:opacity-50 cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current" />
+                    {cargando ? 'Registrando y subiendo foto...' : 'Enviar Confirmación por WhatsApp'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <a
+                    href={urlWhatsAppLista}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      setUrlWhatsAppLista(null);
+                      setMostrarModalConfirmacionWA(false);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs uppercase tracking-wider py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 transition cursor-pointer animate-pulse"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current" />
+                    ¡Abrir WhatsApp y Enviar Mensaje!
+                    <ArrowRight className="w-4 h-4" />
+                  </a>
+                )}
 
-                {!cargando && (
+                {!cargando && !urlWhatsAppLista && (
                   <button
                     type="button"
                     onClick={() => setMostrarModalConfirmacionWA(false)}
