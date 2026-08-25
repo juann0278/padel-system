@@ -29,7 +29,9 @@ import {
 
 import FONDO from './assets/FONDO.jpg.avif';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+// Si Vercel tiene la URL con /api/v1 o sin ella, nos aseguramos de que quede prolijo
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE = rawApiUrl.endsWith('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`;
 const CLUB_SLUG = 'padel-central';
 
 const obtenerFechaLocalISO = (fechaObj = new Date()) => {
