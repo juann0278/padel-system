@@ -276,7 +276,7 @@ export default function App() {
   useEffect(() => {
     if (!vistaAdmin && canchaSeleccionada && fecha) {
       cargarSlots();
-      const intervalId = setInterval(cargarSlots, 12000);
+      const intervalId = setInterval(cargarSlots, 45000);
       return () => clearInterval(intervalId);
     }
   }, [canchaSeleccionada, fecha, vistaAdmin, cargarSlots]);
@@ -284,7 +284,7 @@ export default function App() {
   useEffect(() => {
     if (vistaAdmin && estaAutenticado && club?.id && fecha) {
       cargarReservasAdmin();
-      const intervalId = setInterval(cargarReservasAdmin, 12000);
+      const intervalId = setInterval(cargarReservasAdmin, 45000);
       return () => clearInterval(intervalId);
     }
   }, [vistaAdmin, estaAutenticado, fecha, club?.id, cargarReservasAdmin]);
@@ -1216,8 +1216,8 @@ Acabo de reservar un turno por la web:
                                       Desfijar Turno
                                     </button>
                                   )}
-                                </div>
-                              )}
+                              </div>
+                            )}
                             </div>
 
                             {/* Fila inferior: Datos del Cliente / Grupo y Botón Ver Comprobante */}
@@ -1244,8 +1244,8 @@ Acabo de reservar un turno por la web:
                                   <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
                                 </button>
                               )}
-                            </div>
                           </div>
+                        </div>
                         );
                       })
                     )}
