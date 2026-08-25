@@ -1079,8 +1079,8 @@ Acabo de reservar un turno por la web:
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                {/* Selector de fecha corregido y visible para todos los navegadores */}
-                <div className="flex items-center gap-2.5">
+                {/* Selector de fecha con el día formateado */}
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Fecha de planilla:
                   </label>
@@ -1091,6 +1091,12 @@ Acabo de reservar un turno por la web:
                     onChange={(e) => setFecha(e.target.value)}
                     className="bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 rounded-2xl px-3.5 py-2 text-zinc-100 text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500 transition cursor-pointer"
                   />
+
+                  {fecha && (
+                    <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-xs">
+                      {formatearFechaConDia(fecha)}
+                    </span>
+                  )}
                 </div>
 
                 <button
