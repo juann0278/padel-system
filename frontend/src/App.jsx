@@ -21,20 +21,15 @@ import {
   Ban, 
   Moon, 
   Eye, 
-  EyeOff,
-  RefreshCw,
-  Info
+  EyeOff, 
+  RefreshCw, 
+  Info 
 } from 'lucide-react';
 
 import FONDO from './assets/FONDO.jpg.avif';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.1.36:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 const CLUB_SLUG = 'padel-central';
-
-const MINUTOS_APERTURA = 8 * 60;          // 08:00 hs
-const MINUTOS_CIERRE = 23 * 60 + 30;      // 23:30 hs
-const HORA_APERTURA_LABEL = "08:00";
-const HORA_CIERRE_LABEL = "23:30";
 
 const obtenerFechaLocalISO = (fechaObj = new Date()) => {
   const anio = fechaObj.getFullYear();
@@ -43,7 +38,17 @@ const obtenerFechaLocalISO = (fechaObj = new Date()) => {
   return `${anio}-${mes}-${dia}`;
 };
 
-// Componente visual de carga animado con temática de Pádel
+const formatearFechaConDia = (fechaISO) => {
+  if (!fechaISO) return '';
+  const [anio, mes, dia] = fechaISO.split('-').map(Number);
+  const dateObj = new Date(anio, mes - 1, dia);
+  const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const diaSemana = dias[dateObj.getDay()];
+  const diaFormateado = String(dia).padStart(2, '0');
+  const mesFormateado = String(mes).padStart(2, '0');
+  return `${diaSemana} ${diaFormateado}/${mesFormateado}/${anio}`;
+};
+
 function PadelLoader({ texto = "Cargando complejo..." }) {
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
@@ -136,10 +141,9 @@ export default function App() {
   const [slotSeleccionado, setSlotSeleccionado] = useState(null);
   
   const [reservasAdmin, setReservasAdmin] = useState([]);
-  const [filtroCanchaAdmin, setFiltroCanchaAdmin] = useState('TODAS');
   const [ocultarCancelados, setOcultarCancelados] = useState(true);
 
-  // Modal para creación manual / fija de turnos Admin
+  // Modales
   const [mostrarModalCrearAdmin, setMostrarModalCrearAdmin] = useState(false);
   const [adminCanchaId, setAdminCanchaId] = useState('');
   const [adminFecha, setAdminFecha] = useState(hoyISO);
@@ -149,8 +153,8 @@ export default function App() {
   const [adminEsFijo, setAdminEsFijo] = useState(false);
   const [adminSemanas, setAdminSemanas] = useState(4);
   const [adminError, setAdminError] = useState('');
+  const [adminCanchaFijada, setAdminCanchaFijada] = useState(false);
 
-  // Modal para Bloqueos / Mantenimiento / Lluvia / Torneos
   const [mostrarModalBloqueo, setMostrarModalBloqueo] = useState(false);
   const [bloqueoCanchaId, setBloqueoCanchaId] = useState('0');
   const [tipoBloqueoHorario, setTipoBloqueoHorario] = useState('DIA_COMPLETO');
@@ -167,10 +171,7 @@ export default function App() {
   const [cargando, setCargando] = useState(false);
   const [errorCarga, setErrorCarga] = useState(null);
 
-  // Modal de confirmación obligatoria WhatsApp
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
-
-  // Referencia para scroll automático al seleccionar horario
   const formRef = useRef(null);
 
   useEffect(() => {
@@ -181,7 +182,6 @@ export default function App() {
     }
   }, [slotSeleccionado]);
 
-  // Auto-limpiar el cartel a los 30 segundos si no lo cierran
   useEffect(() => {
     if (mensaje) {
       const timer = setTimeout(() => {
@@ -190,22 +190,6 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [mensaje]);
-
-  const manejarCambioNombre = (valor) => {
-    const filtrado = valor.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
-    setNombre(filtrado);
-  };
-
-  const manejarCambioTelefono = (valor) => {
-    const filtrado = valor.replace(/\D/g, '');
-    setTelefono(filtrado);
-  };
-
-  const estaAbierto = useMemo(() => {
-    const ahora = new Date();
-    const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
-    return minutosActuales >= MINUTOS_APERTURA && minutosActuales < MINUTOS_CIERRE;
-  }, []);
 
   const proximosDias = useMemo(() => {
     const lista = [];
@@ -227,25 +211,36 @@ export default function App() {
     return lista;
   }, []);
 
+  // Carga inicial con tiempo mínimo para apreciar la animación completa del loader
   useEffect(() => {
-    const peticionClub = axios.get(`${API_BASE}/clubes/${CLUB_SLUG}`);
-    const peticionCanchas = axios.get(`${API_BASE}/clubes/${CLUB_SLUG}/canchas`);
-    const delayMinimo = new Promise(resolve => setTimeout(resolve, 1800));
+    const cargarDatos = async () => {
+      try {
+        const delayAnimacion = new Promise(resolve => setTimeout(resolve, 1200));
 
-    Promise.all([peticionClub, peticionCanchas, delayMinimo])
-      .then(([resClub, resCanchas]) => {
+        const [resClub, resCanchas] = await Promise.all([
+          axios.get(`${API_BASE}/clubes/${CLUB_SLUG}`),
+          axios.get(`${API_BASE}/clubes/${CLUB_SLUG}/canchas`),
+          delayAnimacion
+        ]);
+
         setClub(resClub.data);
-        const data = Array.isArray(resCanchas.data) ? resCanchas.data : [];
-        setCanchas(data);
-        if (data.length > 0) {
-          setCanchaSeleccionada(data[0].id);
-          setAdminCanchaId(data[0].id);
+
+        const canchasRecibidas = Array.isArray(resCanchas.data) ? resCanchas.data : [];
+        canchasRecibidas.sort((a, b) => Number(a.id) - Number(b.id));
+
+        setCanchas(canchasRecibidas);
+
+        if (canchasRecibidas.length > 0) {
+          setCanchaSeleccionada(canchasRecibidas[0].id);
+          setAdminCanchaId(canchasRecibidas[0].id);
         }
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Error al cargar la aplicación", err);
         setErrorCarga("No se pudo conectar con el backend o no existe el club.");
-      });
+      }
+    };
+
+    cargarDatos();
   }, []);
 
   const cargarSlots = useCallback(() => {
@@ -266,20 +261,21 @@ export default function App() {
   const cargarReservasAdmin = useCallback(() => {
     if (!club?.id || !fecha) return;
     axios.get(`${API_BASE}/reservas/admin?clubId=${club.id}&fecha=${fecha}`)
-      .then(res => setReservasAdmin(Array.isArray(res.data) ? res.data : []))
+      .then(res => {
+        const data = Array.isArray(res.data) ? res.data : [];
+        setReservasAdmin(data);
+      })
       .catch(() => setReservasAdmin([]));
   }, [club?.id, fecha]);
 
-  // Polling cada 12s para jugador
   useEffect(() => {
-    if (!vistaAdmin && canchaSeleccionada && fecha && estaAbierto) {
+    if (!vistaAdmin && canchaSeleccionada && fecha) {
       cargarSlots();
       const intervalId = setInterval(cargarSlots, 12000);
       return () => clearInterval(intervalId);
     }
-  }, [canchaSeleccionada, fecha, vistaAdmin, estaAbierto, cargarSlots]);
+  }, [canchaSeleccionada, fecha, vistaAdmin, cargarSlots]);
 
-  // Polling cada 12s para admin
   useEffect(() => {
     if (vistaAdmin && estaAutenticado && club?.id && fecha) {
       cargarReservasAdmin();
@@ -317,10 +313,6 @@ export default function App() {
 
   const handlePreReservar = (e) => {
     e.preventDefault();
-    if (!estaAbierto) {
-      alert('El complejo se encuentra cerrado en este momento.');
-      return;
-    }
     const nombreLimpio = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
     const telLimpio = telefono.replace(/\D/g, '').trim();
 
@@ -346,7 +338,7 @@ export default function App() {
 Acabo de reservar un turno por la web:
 
 🎾 *Cancha:* ${canchaNombre}
-📅 *Fecha:* ${fecha}
+📅 *Fecha:* ${formatearFechaConDia(fecha)}
 ⏰ *Horario:* ${slotSeleccionado.horaInicio?.slice(0, 5)} hs
 👤 *Jugador:* ${nombreFinal}
 📱 *Teléfono:* ${telFinal}
@@ -486,13 +478,17 @@ Acabo de reservar un turno por la web:
     }
   };
 
-  const reservasAdminFiltradas = useMemo(() => {
-    return reservasAdmin.filter(r => {
-      const coincideCancha = filtroCanchaAdmin === 'TODAS' || r.cancha?.id === Number(filtroCanchaAdmin);
-      const coincideEstado = ocultarCancelados ? r.estado !== 'CANCELADO' : true;
-      return coincideCancha && coincideEstado;
+  const canchasConReservas = useMemo(() => {
+    return canchas.map(cancha => {
+      const reservas = reservasAdmin
+        .filter(r => (Number(r.cancha?.id) === Number(cancha.id) || Number(r.canchaId) === Number(cancha.id)) && (ocultarCancelados ? r.estado !== 'CANCELADO' : true))
+        .sort((a, b) => (a.horaInicio || '').localeCompare(b.horaInicio || ''));
+      return {
+        ...cancha,
+        reservas
+      };
     });
-  }, [reservasAdmin, filtroCanchaAdmin, ocultarCancelados]);
+  }, [canchas, reservasAdmin, ocultarCancelados]);
 
   const canchaActualObj = canchas.find(c => c.id === canchaSeleccionada);
 
@@ -524,7 +520,7 @@ Acabo de reservar un turno por la web:
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-zinc-950" />
       </div>
 
-      <div className="relative z-10 p-3 sm:p-6 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
+      <div className="relative z-10 p-3 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
         
         {/* Barra superior */}
         <header className="flex items-center justify-between bg-zinc-900/80 border border-zinc-800 backdrop-blur-md p-4 sm:p-5 rounded-3xl shadow-xl">
@@ -538,15 +534,6 @@ Acabo de reservar un turno por la web:
               </h1>
               
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {estaAbierto ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Abierto
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Cerrado
-                  </span>
-                )}
                 <span className="text-[11px] sm:text-xs text-zinc-400 flex items-center gap-1 truncate">
                   <MapPin className="w-3 h-3 text-zinc-500 flex-shrink-0" /> {club.direccion}
                 </span>
@@ -649,7 +636,7 @@ Acabo de reservar un turno por la web:
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500 font-medium">Fecha:</span>
-                  <span className="text-white font-bold">{fecha}</span>
+                  <span className="text-white font-bold">{formatearFechaConDia(fecha)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500 font-medium">Horario:</span>
@@ -713,15 +700,21 @@ Acabo de reservar un turno por la web:
               <form onSubmit={handleCrearTurnoAdmin} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Cancha</label>
-                  <select
-                    value={adminCanchaId}
-                    onChange={(e) => setAdminCanchaId(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500 appearance-none"
-                  >
-                    {canchas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </select>
+                  {adminCanchaFijada ? (
+                    <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-emerald-400 font-bold text-sm">
+                      {canchas.find(c => String(c.id) === String(adminCanchaId))?.nombre || 'Cancha'}
+                    </div>
+                  ) : (
+                    <select
+                      value={adminCanchaId}
+                      onChange={(e) => setAdminCanchaId(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500 appearance-none"
+                    >
+                      {canchas.map(c => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3">
@@ -829,7 +822,8 @@ Acabo de reservar un turno por la web:
             <div className="bg-zinc-900 border border-zinc-800 p-5 sm:p-6 rounded-3xl max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-rose-400 font-bold text-base sm:text-lg">
-                  <Ban className="w-5 h-5" /> Bloquear Pista / Día
+                  <Ban className="w-5 h-5" /> 
+                  {bloqueoCanchaId === '0' ? 'Bloquear Complejo (Todas)' : 'Bloquear Cancha'}
                 </div>
                 <button 
                   onClick={() => setMostrarModalBloqueo(false)}
@@ -840,7 +834,7 @@ Acabo de reservar un turno por la web:
               </div>
 
               {bloqueoError && (
-                <div className="p-3 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-2.5">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   <span>{bloqueoError}</span>
                 </div>
@@ -848,17 +842,16 @@ Acabo de reservar un turno por la web:
 
               <form onSubmit={handleBloquearTurnos} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Alcance de Pistas</label>
-                  <select
-                    value={bloqueoCanchaId}
-                    onChange={(e) => setBloqueoCanchaId(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-rose-500 appearance-none"
-                  >
-                    <option value="0">🚨 Todas las canchas (Complejo entero)</option>
-                    {canchas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </select>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Alcance del Bloqueo</label>
+                  {bloqueoCanchaId === '0' ? (
+                    <div className="w-full bg-zinc-950 border border-rose-500/30 rounded-2xl p-3 text-rose-400 font-black text-xs flex items-center gap-2">
+                      <Ban className="w-4 h-4" /> 🚨 Todas las canchas (Bloqueo Complejo Entero)
+                    </div>
+                  ) : (
+                    <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-rose-400 font-bold text-sm">
+                      {canchas.find(c => String(c.id) === String(bloqueoCanchaId))?.nombre || 'Cancha'} (Pista individual)
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -975,95 +968,66 @@ Acabo de reservar un turno por la web:
         {/* VISTA ADMIN */}
         {vistaAdmin && estaAutenticado ? (
           <main className="space-y-4 sm:space-y-6">
-            <div className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md p-3.5 sm:p-4 rounded-3xl shadow-xl overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 flex-shrink-0">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Fecha de planilla:
-                </label>
-                <div className="w-full sm:w-auto">
-                  <input
-                    type="date"
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                    className="bg-zinc-950 border border-zinc-800 rounded-2xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500 text-base sm:text-sm cursor-pointer w-full sm:w-auto block appearance-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+            <div className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md p-4 sm:p-5 rounded-3xl shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3.5">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-extrabold text-emerald-400 flex items-center gap-2">
-                    <Shield className="w-5 h-5" /> Planilla Diaria
+                  <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-emerald-400" /> Planilla Diaria
                   </h2>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                     <RefreshCw className="w-3 h-3 animate-spin" /> En vivo
                   </span>
                 </div>
-                
-                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
                       setBloqueoError('');
                       setBloqueoFecha(fecha);
+                      setBloqueoCanchaId('0');
                       setMostrarModalBloqueo(true);
                     }}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-2xl transition cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-2xl transition cursor-pointer"
                   >
-                    <Ban className="w-3.5 h-3.5" /> Bloquear
+                    <Ban className="w-3.5 h-3.5" /> Bloquear Complejo
                   </button>
 
                   <button
                     onClick={() => {
                       setAdminError('');
                       setAdminFecha(fecha);
+                      setAdminCanchaFijada(false);
                       setMostrarModalCrearAdmin(true);
                     }}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold text-xs rounded-2xl shadow-lg shadow-emerald-500/20 transition cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold text-xs rounded-2xl shadow-lg shadow-emerald-500/20 transition cursor-pointer"
                   >
                     <PlusCircle className="w-3.5 h-3.5" /> Cargar Turno
                   </button>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-1 min-w-0 scrollbar-none">
-                  <button
-                    onClick={() => setFiltroCanchaAdmin('TODAS')}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer leading-none whitespace-nowrap flex-shrink-0 ${
-                      filtroCanchaAdmin === 'TODAS'
-                        ? 'bg-emerald-400 text-zinc-950 border-emerald-300 shadow-md shadow-emerald-500/20'
-                        : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-                    }`}
-                  >
-                    <Filter className="w-3 h-3" />
-                    Todas ({reservasAdmin.filter(r => ocultarCancelados ? r.estado !== 'CANCELADO' : true).length})
-                  </button>
-                  {canchas.map(c => {
-                    const totalEnCancha = reservasAdmin.filter(r => 
-                      r.cancha?.id === c.id && (ocultarCancelados ? r.estado !== 'CANCELADO' : true)
-                    ).length;
-                    const isSelected = filtroCanchaAdmin === String(c.id);
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => setFiltroCanchaAdmin(String(c.id))}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border whitespace-nowrap transition cursor-pointer leading-none flex-shrink-0 ${
-                          isSelected
-                            ? 'bg-emerald-400 text-zinc-950 border-emerald-300 shadow-md shadow-emerald-500/20'
-                            : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-                        }`}
-                      >
-                        {c.nombre} ({totalEnCancha})
-                      </button>
-                    );
-                  })}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-2.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Fecha de planilla:
+                  </label>
+                  
+                  <div className="relative inline-flex items-center">
+                    <span className="bg-zinc-950 border border-zinc-800 rounded-2xl px-3.5 py-1.5 text-zinc-100 text-xs sm:text-sm font-bold flex items-center gap-2 pointer-events-none">
+                      {formatearFechaConDia(fecha)}
+                    </span>
+                    <input
+                      type="date"
+                      value={fecha}
+                      onChange={(e) => setFecha(e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
                 </div>
 
                 <button
                   onClick={() => setOcultarCancelados(!ocultarCancelados)}
-                  className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border whitespace-nowrap transition cursor-pointer leading-none w-full sm:w-auto ${
+                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
                     !ocultarCancelados
                       ? 'bg-zinc-900 border-emerald-500/50 text-emerald-400'
                       : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
@@ -1073,316 +1037,302 @@ Acabo de reservar un turno por la web:
                   <span>{ocultarCancelados ? 'Cancelados ocultos' : 'Cancelados visibles'}</span>
                 </button>
               </div>
+            </div>
 
-              {reservasAdminFiltradas.length === 0 ? (
-                <p className="text-sm text-zinc-500 py-8 text-center font-medium">No hay reservas ni bloqueos para mostrar.</p>
-              ) : (
-                <>
-                  {/* Vista Tarjetas para Celulares */}
-                  <div className="grid grid-cols-1 gap-2.5 sm:hidden">
-                    {reservasAdminFiltradas.map((reserva) => {
-                      const esBloqueado = reserva.estado === 'BLOQUEADO';
-                      return (
-                        <div key={reserva.id} className="bg-zinc-950/70 border border-zinc-800/90 rounded-2xl p-3.5 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <span className="font-extrabold text-sm text-emerald-400">
-                              {reserva.cancha?.nombre || 'Cancha'}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            {/* Grilla Visual 2x2 de Canchas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {canchasConReservas.map((cancha) => (
+                <section 
+                  key={cancha.id}
+                  className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                    <div>
+                      <h3 className="font-black text-white text-base sm:text-lg">
+                        {cancha.nombre}
+                      </h3>
+                      <p className="text-xs text-emerald-400 font-semibold mt-0.5">
+                        {cancha.reservas.length} {cancha.reservas.length === 1 ? 'registro ocupado / bloqueado' : 'registros ocupados / bloqueados'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setAdminCanchaId(cancha.id);
+                          setAdminCanchaFijada(true);
+                          setAdminFecha(fecha);
+                          setAdminError('');
+                          setMostrarModalCrearAdmin(true);
+                        }}
+                        title="Cargar turno en esta cancha"
+                        className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 text-zinc-300 hover:text-emerald-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" /> Turno
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setBloqueoCanchaId(String(cancha.id));
+                          setBloqueoFecha(fecha);
+                          setBloqueoError('');
+                          setMostrarModalBloqueo(true);
+                        }}
+                        title="Bloquear esta cancha"
+                        className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-rose-500/50 text-zinc-300 hover:text-rose-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                      >
+                        <Ban className="w-3.5 h-3.5" /> Bloquear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5 flex-1 min-h-[160px]">
+                    {cancha.reservas.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-zinc-800 rounded-2xl bg-zinc-950/40">
+                        <Clock className="w-7 h-7 text-zinc-700 mb-1.5" />
+                        <p className="text-xs font-semibold text-zinc-400">Sin reservas ni bloqueos para hoy</p>
+                        <p className="text-[11px] text-zinc-600 mt-0.5">Todos los horarios se encuentran disponibles</p>
+                      </div>
+                    ) : (
+                      cancha.reservas.map((reserva) => {
+                        const esBloqueado = reserva.estado === 'BLOQUEADO';
+                        const esCancelado = reserva.estado === 'CANCELADO';
+
+                        return (
+                          <div
+                            key={reserva.id}
+                            className={`p-3 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                               esBloqueado
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                : reserva.estado === 'CONFIRMADO' 
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                            }`}>
-                              {reserva.estado}
-                            </span>
-                          </div>
+                                ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
+                                : esCancelado
+                                ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
+                                : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
+                            }`}
+                          >
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-xs sm:text-sm text-white flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                                  {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
+                                </span>
+                                
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                                  esBloqueado
+                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                    : reserva.estado === 'CONFIRMADO'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                                }`}>
+                                  {reserva.estado}
+                                </span>
+                              </div>
 
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5 text-white font-black">
-                              <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                              {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
+                              <div className="text-xs flex items-center gap-2 text-zinc-300">
+                                <span className="font-semibold truncate max-w-[180px]">
+                                  {reserva.nombreCliente || 'Sin nombre'}
+                                </span>
+                                {reserva.telefonoCliente && (
+                                  <span className="text-zinc-500 text-[11px] truncate">
+                                    • {reserva.telefonoCliente}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-zinc-400 truncate max-w-[140px] text-right">
-                              {reserva.telefonoCliente}
-                            </div>
-                          </div>
 
-                          <div className="flex items-center justify-between border-t border-zinc-800/80 pt-2 text-xs">
-                            <div className={`font-medium truncate max-w-[170px] ${esBloqueado ? 'text-rose-300' : 'text-zinc-200'}`}>
-                              {reserva.nombreCliente}
-                            </div>
                             {reserva.estado !== 'CANCELADO' && (
                               <button
                                 onClick={() => handleCancelarReserva(reserva.id)}
-                                className="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-xl font-bold transition cursor-pointer"
+                                className="self-end sm:self-center text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer flex-shrink-0"
                               >
                                 {esBloqueado ? 'Desbloquear' : 'Liberar'}
                               </button>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
-
-                  {/* Vista Tabla para Pantallas Medianas/Grandes */}
-                  <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-zinc-800 text-zinc-400 text-[11px] uppercase tracking-wider">
-                          <th className="pb-3 px-2">Cancha</th>
-                          <th className="pb-3 px-2 whitespace-nowrap">Horario</th>
-                          <th className="pb-3 px-2">Cliente / Motivo</th>
-                          <th className="pb-3 px-2 whitespace-nowrap">Teléfono</th>
-                          <th className="pb-3 px-2">Estado</th>
-                          <th className="pb-3 px-2 text-right">Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800/60">
-                        {reservasAdminFiltradas.map((reserva) => {
-                          const esBloqueado = reserva.estado === 'BLOQUEADO';
-                          return (
-                            <tr key={reserva.id} className="hover:bg-zinc-950/40 transition">
-                              <td className="py-3.5 px-2 font-semibold text-emerald-400 whitespace-nowrap">
-                                {reserva.cancha?.nombre || 'Cancha'}
-                              </td>
-                              <td className="py-3.5 px-2 font-bold text-white whitespace-nowrap">
-                                {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
-                              </td>
-                              <td className={`py-3.5 px-2 font-medium ${esBloqueado ? 'text-rose-300' : 'text-zinc-200'}`}>
-                                {reserva.nombreCliente}
-                              </td>
-                              <td className="py-3.5 px-2 text-zinc-400 text-xs whitespace-nowrap">{reserva.telefonoCliente}</td>
-                              <td className="py-3.5 px-2">
-                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                                  esBloqueado
-                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                    : reserva.estado === 'CONFIRMADO' 
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                                }`}>
-                                  {reserva.estado}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-2 text-right whitespace-nowrap">
-                                {reserva.estado !== 'CANCELADO' && (
-                                  <button
-                                    onClick={() => handleCancelarReserva(reserva.id)}
-                                    className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl font-semibold transition cursor-pointer"
-                                  >
-                                    {esBloqueado ? 'Desbloquear' : 'Liberar'}
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
+                </section>
+              ))}
             </div>
           </main>
         ) : (
           /* VISTA CLIENTE */
           <main className="space-y-4 sm:space-y-6">
-            {!estaAbierto ? (
-              <section className="bg-zinc-900/90 border border-amber-500/30 backdrop-blur-md rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-2xl">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto">
-                  <Moon className="w-6 h-6 sm:w-7 sm:h-7" />
+            {mensaje && (
+              <div className={`p-4 sm:p-5 rounded-3xl border backdrop-blur-md shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${
+                mensaje.tipo === 'exito' 
+                  ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200' 
+                  : 'bg-rose-950/80 border-rose-800 text-rose-300'
+              }`}>
+                <div className="flex items-center gap-3">
+                  {mensaje.tipo === 'exito' ? (
+                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-emerald-400" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-rose-400" />
+                  )}
+                  <p className="text-xs sm:text-sm font-bold text-white leading-snug">{mensaje.texto}</p>
                 </div>
-                <div className="space-y-1">
-                  <h2 className="text-lg sm:text-xl font-black text-white">Complejo Cerrado por Descanso</h2>
-                  <p className="text-xs sm:text-sm text-zinc-400 max-w-md mx-auto">
-                    Nuestro horario de atención y reservas es de <span className="text-white font-bold">{HORA_APERTURA_LABEL} hs</span> a <span className="text-white font-bold">{HORA_CIERRE_LABEL} hs</span>.
-                  </p>
-                </div>
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-zinc-950 border border-zinc-800 text-zinc-300 text-[11px] sm:text-xs font-semibold">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
-                  El sistema se habilitará automáticamente a las {HORA_APERTURA_LABEL} hs.
-                </div>
-              </section>
-            ) : (
-              <>
-                {mensaje && (
-                  <div className={`p-4 sm:p-5 rounded-3xl border backdrop-blur-md shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${
-                    mensaje.tipo === 'exito' 
-                      ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200' 
-                      : 'bg-rose-950/80 border-rose-800 text-rose-300'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      {mensaje.tipo === 'exito' ? (
-                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-emerald-400" />
-                      ) : (
-                        <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-rose-400" />
-                      )}
-                      <p className="text-xs sm:text-sm font-bold text-white leading-snug">{mensaje.texto}</p>
-                    </div>
+                <button
+                  onClick={() => setMensaje(null)}
+                  className="text-zinc-400 hover:text-white p-1 rounded-lg transition flex-shrink-0 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Selector de Días Semanales (8 Días) */}
+            <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-400" /> 1. Elegí el día de tu partido
+              </label>
+              
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 sm:gap-2">
+                {proximosDias.map((d) => {
+                  const isSelected = fecha === d.fechaISO;
+                  return (
                     <button
-                      onClick={() => setMensaje(null)}
-                      className="text-zinc-400 hover:text-white p-1 rounded-lg transition flex-shrink-0 cursor-pointer"
+                      key={d.fechaISO}
+                      onClick={() => setFecha(d.fechaISO)}
+                      className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer ${
+                        isSelected
+                          ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
+                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                      }`}
                     >
-                      <X className="w-4 h-4" />
+                      <span className={`text-[9px] sm:text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-zinc-950' : 'text-zinc-400'}`}>
+                        {d.etiqueta}
+                      </span>
+                      <span className="text-base sm:text-lg font-black mt-0.5 tracking-tight">
+                        {d.diaNumero}
+                      </span>
+                      <span className={`text-[9px] sm:text-[10px] font-semibold ${isSelected ? 'text-zinc-900' : 'text-zinc-500'}`}>
+                        {d.mes}
+                      </span>
                     </button>
-                  </div>
-                )}
+                  );
+                })}
+              </div>
+            </section>
 
-                {/* Selector de Días Semanales (8 Días) */}
-                <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-emerald-400" /> 1. Elegí el día de tu partido
-                  </label>
-                  
-                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 sm:gap-2">
-                    {proximosDias.map((d) => {
-                      const isSelected = fecha === d.fechaISO;
-                      return (
-                        <button
-                          key={d.fechaISO}
-                          onClick={() => setFecha(d.fechaISO)}
-                          className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer ${
-                            isSelected
-                              ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
-                              : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
-                          }`}
-                        >
-                          <span className={`text-[9px] sm:text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-zinc-950' : 'text-zinc-400'}`}>
-                            {d.etiqueta}
-                          </span>
-                          <span className="text-base sm:text-lg font-black mt-0.5 tracking-tight">
-                            {d.diaNumero}
-                          </span>
-                          <span className={`text-[9px] sm:text-[10px] font-semibold ${isSelected ? 'text-zinc-900' : 'text-zinc-500'}`}>
-                            {d.mes}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                {/* Selector Canchas */}
-                <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">2. Seleccioná la cancha</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                    {canchas.map(c => {
-                      const isSelected = canchaSeleccionada === c.id;
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => setCanchaSeleccionada(c.id)}
-                          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${
-                            isSelected 
-                              ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg' 
-                              : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
-                          }`}
-                        >
-                          <div>
-                            <p className="text-white font-bold text-sm sm:text-base">{c.nombre}</p>
-                            <p className="text-xs text-zinc-400 mt-0.5">{c.tipo || 'Pista Profesional'}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-xs font-black px-2.5 py-1 rounded-xl bg-zinc-900 border border-zinc-800 text-emerald-400">
-                              ${c.precioBase}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                {/* Horarios */}
-                <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
-                      <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> 3. Horarios Disponibles (90 min)
-                    </h2>
-                    <span className="text-[11px] sm:text-xs text-zinc-400 font-medium">Turnos estándar</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                    {slots.map((slot, idx) => {
-                      const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
-                      return (
-                        <button
-                          key={idx}
-                          disabled={!slot.disponible}
-                          onClick={() => setSlotSeleccionado(slot)}
-                          className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
-                            !slot.disponible
-                              ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
-                              : isSelected
-                              ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
-                              : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
-                          }`}
-                        >
-                          <span className="text-xs sm:text-sm">{slot.horaInicio?.slice(0, 5)} hs</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                {/* Formulario de Confirmación */}
-                {slotSeleccionado && (
-                  <form 
-                    ref={formRef}
-                    onSubmit={handlePreReservar} 
-                    className="bg-zinc-900/90 border border-emerald-500/40 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-2xl backdrop-blur-md"
-                  >
-                    <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                      <div>
-                        <h3 className="font-extrabold text-white text-sm sm:text-base">Completá tus datos para jugar</h3>
-                        <p className="text-xs text-emerald-400 font-semibold mt-0.5">
-                          Turno seleccionado: {slotSeleccionado.horaInicio?.slice(0, 5)} hs
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Nombre y Apellido</label>
-                        <input
-                          type="text"
-                          required
-                          inputMode="text"
-                          autoComplete="name"
-                          placeholder="Ej: Juan Pérez"
-                          value={nombre}
-                          onChange={(e) => manejarCambioNombre(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-400 transition"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">WhatsApp / Teléfono</label>
-                        <input
-                          type="tel"
-                          required
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          autoComplete="tel"
-                          placeholder="Ej: 2494123456"
-                          value={telefono}
-                          onChange={(e) => manejarCambioTelefono(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-400 transition"
-                        />
-                      </div>
-                    </div>
-
+            {/* Selector Canchas (4 Canchas Reales) */}
+            <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">2. Seleccioná la cancha</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+                {canchas.map(c => {
+                  const isSelected = canchaSeleccionada === c.id;
+                  return (
                     <button
-                      type="submit"
-                      className="w-full bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 px-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition mt-2 cursor-pointer flex items-center justify-center gap-2"
+                      key={c.id}
+                      onClick={() => setCanchaSeleccionada(c.id)}
+                      className={`p-3.5 sm:p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${
+                        isSelected 
+                          ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg' 
+                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                      }`}
                     >
-                      <span>Continuar con la Reserva</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <div>
+                        <p className="text-white font-bold text-sm sm:text-base">{c.nombre}</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">{c.tipo}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-black px-2.5 py-1 rounded-xl bg-zinc-900 border border-zinc-800 text-emerald-400">
+                          ${c.precioBase}
+                        </span>
+                      </div>
                     </button>
-                  </form>
-                )}
-              </>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Horarios */}
+            <section className="bg-zinc-900/80 border border-zinc-800 backdrop-blur-md rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> 3. Horarios Disponibles (90 min)
+                </h2>
+                <span className="text-[11px] sm:text-xs text-zinc-400 font-medium">Turnos estándar</span>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                {slots.map((slot, idx) => {
+                  const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={!slot.disponible}
+                      onClick={() => setSlotSeleccionado(slot)}
+                      className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
+                        !slot.disponible
+                          ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
+                          : isSelected
+                          ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
+                          : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
+                      }`}
+                    >
+                      <span className="text-xs sm:text-sm">{slot.horaInicio?.slice(0, 5)} hs</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Formulario de Confirmación */}
+            {slotSeleccionado && (
+              <form 
+                ref={formRef}
+                onSubmit={handlePreReservar} 
+                className="bg-zinc-900/90 border border-emerald-500/40 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-2xl backdrop-blur-md"
+              >
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div>
+                    <h3 className="font-extrabold text-white text-sm sm:text-base">Completá tus datos para jugar</h3>
+                    <p className="text-xs text-emerald-400 font-semibold mt-0.5">
+                      Turno seleccionado: {slotSeleccionado.horaInicio?.slice(0, 5)} hs
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Nombre y Apellido</label>
+                    <input
+                      type="text"
+                      required
+                      inputMode="text"
+                      autoComplete="name"
+                      placeholder="Ej: Juan Pérez"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ''))}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-400 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">WhatsApp / Teléfono</label>
+                    <input
+                      type="tel"
+                      required
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="tel"
+                      placeholder="Ej: 2494123456"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-400 transition"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 px-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition mt-2 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>Continuar con la Reserva</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
             )}
           </main>
         )}
