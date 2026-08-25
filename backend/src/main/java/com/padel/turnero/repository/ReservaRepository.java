@@ -19,6 +19,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
 
     List<Reserva> findByCanchaIdAndFechaAndEstadoNot(Long canchaId, LocalDate fecha, EstadoReserva estado);
 
+
     List<Reserva> findByCanchaClubIdAndFechaOrderByHoraInicioAsc(Long clubId, LocalDate fecha);
 
     Optional<Reserva> findByCanchaIdAndFechaAndHoraInicio(Long canchaId, LocalDate fecha, LocalTime horaInicio);

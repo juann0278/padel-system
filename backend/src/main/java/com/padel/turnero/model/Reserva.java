@@ -44,6 +44,9 @@ public class Reserva {
     @Column(name = "telefono_cliente", nullable = false, length = 20)
     private String telefonoCliente;
 
+    @Column(name = "comprobante_imagen")
+    private String comprobanteImagen;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EstadoReserva estado;

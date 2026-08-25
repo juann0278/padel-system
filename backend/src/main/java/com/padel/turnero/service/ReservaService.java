@@ -10,8 +10,10 @@ import com.padel.turnero.model.Reserva;
 import com.padel.turnero.repository.CanchaRepository;
 import com.padel.turnero.repository.ReservaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -244,6 +246,24 @@ public class ReservaService {
                 }
             }
         }
+    }
+
+    @Autowired
+    private FileStorageService fileStorageService; // Inyectás el servicio de archivos
+
+    @Transactional
+    public void confirmarPagoConImagen(Long reservaId, MultipartFile file) {
+        Reserva reserva = reservaRepository.findById(reservaId)
+                .orElseThrow(() -> new RuntimeException("Reserva no encontrada"));
+
+        // Guardamos la imagen y obtenemos el nombre de archivo único
+        String nombreArchivo = fileStorageService.guardarArchivo(file);
+
+        // Actualizamos la reserva
+        reserva.setComprobanteImagen(nombreArchivo);
+        reserva.setEstado(EstadoReserva.CONFIRMADO);
+
+        reservaRepository.save(reserva);
     }
 
     @Transactional

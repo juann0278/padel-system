@@ -9,6 +9,7 @@ import com.padel.turnero.service.ReservaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -69,6 +70,18 @@ public class ReservaController {
         try {
             reservaService.cancelarReserva(id);
             return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/confirmar-pago")
+    public ResponseEntity<?> confirmarPago(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            reservaService.confirmarPagoConImagen(id, file);
+            return ResponseEntity.ok("Pago confirmado y comprobante guardado con éxito.");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
