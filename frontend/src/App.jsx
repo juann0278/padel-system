@@ -267,13 +267,13 @@ export default function App() {
       .catch(() => setReservasAdmin([]));
   }, [club?.id, fecha]);
 
-  useEffect(() => {
+useEffect(() => {
     if (!vistaAdmin && canchaSeleccionada && fecha) {
       cargarSlots();
-      const intervalId = setInterval(cargarSlots, 45000);
+      const intervalId = setInterval(cargarSlots, 5000); // Actualiza cada 5 segundos
       return () => clearInterval(intervalId);
     }
-  }, [canchaSeleccionada, fecha, vistaAdmin, cargarSlots]);
+  }, [vistaAdmin, canchaSeleccionada, fecha, cargarSlots]);
 
   useEffect(() => {
     if (vistaAdmin && estaAutenticado && club?.id && fecha) {
