@@ -142,14 +142,13 @@ export default function App() {
   
   const [slots, setSlots] = useState([]);
   const [slotSeleccionado, setSlotSeleccionado] = useState(null);
+  const [reservaTemporalId, setReservaTemporalId] = useState(null);
   
   const [reservasAdmin, setReservasAdmin] = useState([]);
   const [ocultarCancelados, setOcultarCancelados] = useState(true);
 
-  // Modal para ver imagen de comprobante (Admin)
   const [imagenModalUrl, setImagenModalUrl] = useState(null);
 
-  // Modales
   const [mostrarModalCrearAdmin, setMostrarModalCrearAdmin] = useState(false);
   const [adminCanchaId, setAdminCanchaId] = useState('');
   const [adminFecha, setAdminFecha] = useState(hoyISO);
@@ -169,7 +168,6 @@ export default function App() {
   const [bloqueoError, setBloqueoError] = useState('');
   const [bloqueando, setBloqueando] = useState(false);
 
-  // Formulario cliente & éxito
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [comprobanteArchivo, setComprobanteArchivo] = useState(null);
@@ -254,11 +252,7 @@ export default function App() {
       .then(res => {
         const nuevosSlots = Array.isArray(res.data) ? res.data : [];
         setSlots(nuevosSlots);
-        setSlotSeleccionado(prev => {
-          if (!prev) return null;
-          const sigueDisponible = nuevosSlots.some(s => s.horaInicio === prev.horaInicio && s.disponible);
-          return sigueDisponible ? prev : null;
-        });
+        // Dejamos el slot seleccionado fijo para que no desaparezca el formulario
       })
       .catch(() => setSlots([]));
   }, [canchaSeleccionada, fecha]);
@@ -288,6 +282,36 @@ export default function App() {
       return () => clearInterval(intervalId);
     }
   }, [vistaAdmin, estaAutenticado, fecha, club?.id, cargarReservasAdmin]);
+
+  // Bloqueo temporal de 3 minutos al hacer clic en un slot libre y despliegue del formulario
+  const handleSeleccionarSlot = async (slot) => {
+    if (!slot.disponible) return;
+    
+    // Nos aseguramos que la hora vaya con segundos por si acaso
+    const horaFormateada = slot.horaInicio.length === 5 ? `${slot.horaInicio}:00` : slot.horaInicio;
+
+    try {
+      const res = await axios.post(`${API_BASE}/reservas/temporal`, {
+        canchaId: Number(canchaSeleccionada),
+        fecha: fecha,
+        horaInicio: horaFormateada,
+        nombreCliente: "Bloqueo Temporal",
+        telefonoCliente: "PENDIENTE"
+      });
+      setReservaTemporalId(res.data.id);
+      setSlotSeleccionado(slot);
+      cargarSlots();
+    } catch (err) {
+      console.error("Error al iniciar reserva temporal:", err.response?.data);
+      
+      // Mensaje claro y transparente para el usuario en tiempo real
+      const msg = 'Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.';
+      
+      // Mostramos la alerta prolija arriba en la interfaz
+      setMensaje({ tipo: 'error', texto: msg });
+      cargarSlots();
+    }
+  };
 
   const handleAccesoAdmin = () => {
     if (estaAutenticado) {
@@ -369,7 +393,11 @@ Acabo de reservar un turno por la web:
     const urlWhatsAppWeb = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${textoEncoded}`;
 
     try {
-      const resReserva = await axios.post(`${API_BASE}/reservas`, {
+      if (!reservaTemporalId) {
+        throw new Error("No hay una reserva temporal activa. Seleccioná el horario nuevamente.");
+      }
+
+      await axios.post(`${API_BASE}/reservas`, {
         canchaId: canchaSeleccionada,
         fecha,
         horaInicio: slotSeleccionado.horaInicio,
@@ -377,13 +405,11 @@ Acabo de reservar un turno por la web:
         telefonoCliente: telFinal
       });
 
-      const reservaId = resReserva.data?.id;
-      
-      if (reservaId && comprobanteArchivo) {
+      if (reservaTemporalId && comprobanteArchivo) {
         const formData = new FormData();
         formData.append('file', comprobanteArchivo);
 
-        await axios.put(`${API_BASE}/reservas/${reservaId}/confirmar-pago`, formData, {
+        await axios.put(`${API_BASE}/reservas/${reservaTemporalId}/confirmar-pago`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -396,6 +422,7 @@ Acabo de reservar un turno por la web:
       setTelefono('');
       setComprobanteArchivo(null);
       setSlotSeleccionado(null);
+      setReservaTemporalId(null);
 
       setMostrarModalConfirmacionWA(false);
 
@@ -407,7 +434,7 @@ Acabo de reservar un turno por la web:
       }
 
     } catch (err) {
-      setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : 'Error al procesar la reserva' });
+      setMensaje({ tipo: 'error', texto: typeof err.response?.data === 'string' ? err.response.data : err.message || 'Error al procesar la reserva' });
       setMostrarModalConfirmacionWA(false);
     } finally {
       setCargando(false);
@@ -1301,8 +1328,8 @@ Acabo de reservar un turno por la web:
                       onClick={() => setFecha(d.fechaISO)}
                       className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer ${
                         isSelected
-                          ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
-                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                            ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
+                            : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
                       }`}
                     >
                       <span className={`text-[9px] sm:text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-zinc-950' : 'text-zinc-400'}`}>
@@ -1332,8 +1359,8 @@ Acabo de reservar un turno por la web:
                       onClick={() => setCanchaSeleccionada(c.id)}
                       className={`p-3.5 sm:p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${
                         isSelected 
-                          ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg' 
-                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                            ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg' 
+                            : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
                       }`}
                     >
                       <div>
@@ -1347,36 +1374,36 @@ Acabo de reservar un turno por la web:
             </section>
 
             {/* Horarios */}
-            <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
-                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> 3. Horarios Disponibles (90 min)
-                </h2>
-                <span className="text-[11px] sm:text-xs text-zinc-400 font-medium">Turnos estándar</span>
-              </div>
-               
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                {slots.map((slot, idx) => {
-                  const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
-                  return (
-                    <button
-                      key={idx}
-                      disabled={!slot.disponible}
-                      onClick={() => setSlotSeleccionado(slot)}
-                      className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
-                        !slot.disponible
+          <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> 3. Horarios Disponibles (90 min)
+              </h2>
+              <span className="text-[11px] sm:text-xs text-zinc-400 font-medium">Turnos estándar</span>
+            </div>
+             
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+              {slots.map((slot, idx) => {
+                const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
+                return (
+                  <button
+                    key={idx}
+                    disabled={!slot.disponible}
+                    onClick={() => handleSeleccionarSlot(slot)} // <--- ACÁ ESTABA EL SECRETO: Llama al método que hace el POST /temporal
+                    className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
+                      !slot.disponible
                           ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
                           : isSelected
                           ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
                           : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
-                      }`}
-                    >
-                      <span className="text-xs sm:text-sm">{slot.horaInicio?.slice(0, 5)} hs</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
+                    }`}
+                  >
+                    <span className="text-xs sm:text-sm">{slot.horaInicio?.slice(0, 5)} hs</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
             {/* Formulario de Confirmación */}
             {slotSeleccionado && (
@@ -1389,7 +1416,7 @@ Acabo de reservar un turno por la web:
                   <div>
                     <h3 className="font-extrabold text-white text-sm sm:text-base">Datos para transferir y confirmar</h3>
                     <p className="text-xs text-emerald-400 font-semibold mt-0.5">
-                      Turno seleccionado: {slotSeleccionado.horaInicio?.slice(0, 5)} hs
+                      Turno seleccionado: {slotSeleccionado.horaInicio?.slice(0, 5)} hs (Bloqueado por 3 min)
                     </p>
                   </div>
                 </div>
@@ -1515,13 +1542,36 @@ Acabo de reservar un turno por la web:
                   </span>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 px-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition mt-2 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>Continuar y Confirmar Turno</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                <div className="space-y-2.5 mt-2">
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 px-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>Continuar y Confirmar Turno</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (reservaTemporalId) {
+                        try {
+                          await axios.patch(`${API_BASE}/reservas/temporal/${reservaTemporalId}/liberar`);
+                        } catch (err) {
+                          console.error("Error al liberar el turno temporal", err);
+                        }
+                      }
+                      setSlotSeleccionado(null);
+                      setReservaTemporalId(null);
+                      setComprobanteArchivo(null);
+                      cargarSlots();
+                      window.scrollTo({ top: 200, behavior: 'smooth' });
+                    }}
+                    className="w-full bg-zinc-800/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 font-bold text-xs uppercase tracking-wider py-3 px-4 rounded-2xl transition cursor-pointer"
+                  >
+                    Elegir otro horario / Cancelar
+                  </button>
+                </div>
               </form>
             )}
           </main>
