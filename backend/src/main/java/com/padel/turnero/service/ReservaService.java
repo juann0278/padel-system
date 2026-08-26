@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,10 +30,12 @@ public class ReservaService {
     private final CanchaRepository canchaRepository;
 
     public List<SlotHorarioDTO> obtenerDisponibilidad(Long canchaId, LocalDate fecha) {
+        // Traemos las reservas (excluyendo canceladas)
         List<Reserva> reservas = reservaRepository.findByCanchaIdAndFechaAndEstadoNot(canchaId, fecha, EstadoReserva.CANCELADO);
 
         LocalDate hoy = LocalDate.now();
         LocalTime ahora = LocalTime.now();
+        LocalDateTime ahoraTiempo = LocalDateTime.now(); // <--- Necesario para comparar con el expiraAt
         boolean esHoy = fecha.equals(hoy);
 
         List<LocalTime> horarios = List.of(
@@ -46,11 +49,24 @@ public class ReservaService {
         for (LocalTime h : horarios) {
             LocalTime fin = h.equals(LocalTime.of(23, 0)) ? LocalTime.of(23, 59, 59) : h.plusMinutes(90);
 
-            // 1. Verificamos si ya está ocupado por otra reserva o bloqueo
-            boolean ocupado = reservas.stream().anyMatch(r ->
-                    r.getHoraInicio().equals(h) ||
-                            (!h.equals(LocalTime.of(23, 0)) && h.isBefore(r.getHoraFin()) && fin.isAfter(r.getHoraInicio()))
-            );
+            // 1. Verificamos si ya está ocupado por otra reserva, bloqueo fijo, o un temporal vigente (< 3 min)
+            boolean ocupado = reservas.stream().anyMatch(r -> {
+                // Está ocupado de forma firme si es Confirmado, Bloqueado o Fijo
+                boolean ocupadoFirme = r.getEstado() == EstadoReserva.CONFIRMADO ||
+                        r.getEstado() == EstadoReserva.BLOQUEADO ||
+                        r.getEstado() == EstadoReserva.FIJO;
+
+                // O está ocupado temporalmente si es PENDIENTE_TEMPORAL y aún no se venció el expiraAt
+                boolean temporalVigente = r.getEstado() == EstadoReserva.PENDIENTE_TEMPORAL &&
+                        r.getExpiraAt() != null &&
+                        r.getExpiraAt().isAfter(ahoraTiempo);
+
+                // Verificamos si se cruza con el horario del slot
+                boolean seSolapaHorario = r.getHoraInicio().equals(h) ||
+                        (!h.equals(LocalTime.of(23, 0)) && h.isBefore(r.getHoraFin()) && fin.isAfter(r.getHoraInicio()));
+
+                return (ocupadoFirme || temporalVigente) && seSolapaHorario;
+            });
 
             // 2. Si la consulta es para el día de hoy y el horario ya pasó, se inhabilita
             boolean yaPaso = esHoy && h.isBefore(ahora);
@@ -60,6 +76,17 @@ public class ReservaService {
             slots.add(new SlotHorarioDTO(h, fin, disponible));
         }
         return slots;
+    }
+
+    @Transactional
+    public void liberarReservaTemporal(Long id) {
+        Reserva reserva = reservaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Reserva no encontrada"));
+
+        // Si era un temporal, lo borramos directamente de la base para que no ensucie la planilla
+        if (reserva.getEstado() == EstadoReserva.PENDIENTE_TEMPORAL) {
+            reservaRepository.delete(reserva);
+        }
     }
 
     @Transactional
@@ -76,25 +103,34 @@ public class ReservaService {
                 ? LocalTime.of(23, 59, 59)
                 : dto.getHoraInicio().plusMinutes(90);
 
-        boolean solapa = reservaRepository.existeSolapamiento(
-                cancha.getId(), dto.getFecha(), dto.getHoraInicio(), horaFin, EstadoReserva.CANCELADO
-        );
-
-        if (solapa) {
-            throw new RuntimeException("El turno ya no está disponible en ese horario.");
-        }
-
+        // Buscamos si ya existe el registro temporal que creamos al hacer clic en el slot
         Optional<Reserva> existenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
                 cancha.getId(), dto.getFecha(), dto.getHoraInicio()
         );
 
         if (existenteOpt.isPresent()) {
             Reserva r = existenteOpt.get();
+            // Si ya está confirmado por otra vía de forma firme, frenamos
+            if (r.getEstado() == EstadoReserva.CONFIRMADO || r.getEstado() == EstadoReserva.BLOQUEADO || r.getEstado() == EstadoReserva.FIJO) {
+                throw new RuntimeException("El turno ya se encuentra ocupado.");
+            }
+
+            // Actualizamos el registro existente con los datos reales del cliente y lo confirmamos
             r.setNombreCliente(dto.getNombreCliente());
             r.setTelefonoCliente(dto.getTelefonoCliente());
             r.setEstado(EstadoReserva.CONFIRMADO);
             r.setHoraFin(horaFin);
+            r.setExpiraAt(null); // Limpiamos la expiración temporal ya que pasó a confirmada
             return reservaRepository.save(r);
+        }
+
+        // Por seguridad si no existiera el temporal, verificamos solapamiento estricto y creamos
+        boolean solapa = reservaRepository.existeSolapamiento(
+                cancha.getId(), dto.getFecha(), dto.getHoraInicio(), horaFin, EstadoReserva.CANCELADO
+        );
+
+        if (solapa) {
+            throw new RuntimeException("El turno ya no está disponible en ese horario.");
         }
 
         Reserva reserva = Reserva.builder()
@@ -165,7 +201,20 @@ public class ReservaService {
     }
 
     public List<Reserva> obtenerReservasAdmin(Long clubId, LocalDate fecha) {
-        return reservaRepository.findByCanchaClubIdAndFechaOrderByHoraInicioAsc(clubId, fecha);
+        List<Reserva> reservas = reservaRepository.findByCanchaClubIdAndFechaOrderByHoraInicioAsc(clubId, fecha);
+        LocalDateTime ahora = LocalDateTime.now();
+
+        // Filtramos o limpiamos los temporales que ya expiraron para que el admin no los vea
+        List<Reserva> reservasFiltradas = new ArrayList<>();
+        for (Reserva r : reservas) {
+            if (r.getEstado() == EstadoReserva.PENDIENTE_TEMPORAL && r.getExpiraAt() != null && r.getExpiraAt().isBefore(ahora)) {
+                // Opcional: si querés que se borren físicamente de la base al expirar cuando el admin entra
+                reservaRepository.delete(r);
+            } else {
+                reservasFiltradas.add(r);
+            }
+        }
+        return reservasFiltradas;
     }
 
     @Transactional
@@ -285,5 +334,64 @@ public class ReservaService {
             r.setEstado(EstadoReserva.CANCELADO);
             reservaRepository.save(r);
         }
+    }
+
+    @Transactional
+    public Reserva iniciarReservaTemporal(CrearReservaDTO dto) {
+        Cancha cancha = canchaRepository.findById(dto.getCanchaId())
+                .orElseThrow(() -> new RuntimeException("Cancha no encontrada"));
+
+        // Validar que no sea un horario pasado
+        if (dto.getFecha().equals(LocalDate.now()) && dto.getHoraInicio().isBefore(LocalTime.now())) {
+            throw new RuntimeException("No se pueden seleccionar horarios pasados.");
+        }
+
+        LocalTime horaFin = dto.getHoraInicio().equals(LocalTime.of(23, 0))
+                ? LocalTime.of(23, 59, 59)
+                : dto.getHoraInicio().plusMinutes(90);
+
+        // Verificar si ya está ocupado (ya sea confirmado, bloqueado, fijo o con un temporal vigente)
+        // Opcional: Podés crear un método en el repositorio que verifique solapamientos considerando expiración
+        boolean solapa = reservaRepository.existeSolapamiento(
+                cancha.getId(), dto.getFecha(), dto.getHoraInicio(), horaFin, EstadoReserva.CANCELADO
+        );
+
+        if (solapa) {
+            throw new RuntimeException("El turno ya no está disponible, fue tomado por otro usuario.");
+        }
+
+        // Buscamos si ya existe un registro previo para esa cancha/fecha/hora (por ejemplo, uno viejo que expiró)
+        Optional<Reserva> existenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
+                cancha.getId(), dto.getFecha(), dto.getHoraInicio()
+        );
+
+        if (existenteOpt.isPresent()) {
+            Reserva r = existenteOpt.get();
+            // Si ya está confirmado o bloqueado posta, no se puede
+            if (r.getEstado() == EstadoReserva.CONFIRMADO || r.getEstado() == EstadoReserva.BLOQUEADO || r.getEstado() == EstadoReserva.FIJO) {
+                throw new RuntimeException("El turno ya se encuentra ocupado.");
+            }
+            // Si era un temporal vencido o cancelado, lo reciclamos y le damos 3 minutos nuevos
+            r.setNombreCliente(dto.getNombreCliente() != null ? dto.getNombreCliente() : "Bloqueo Temporal");
+            r.setTelefonoCliente(dto.getTelefonoCliente() != null ? dto.getTelefonoCliente() : "PENDIENTE");
+            r.setEstado(EstadoReserva.PENDIENTE_TEMPORAL);
+            r.setExpiraAt(LocalDateTime.now().plusMinutes(3));
+            r.setHoraFin(horaFin);
+            return reservaRepository.save(r);
+        }
+
+        // Si no existe, creamos uno nuevo temporal
+        Reserva reserva = Reserva.builder()
+                .cancha(cancha)
+                .fecha(dto.getFecha())
+                .horaInicio(dto.getHoraInicio())
+                .horaFin(horaFin)
+                .nombreCliente(dto.getNombreCliente() != null ? dto.getNombreCliente() : "Bloqueo Temporal")
+                .telefonoCliente(dto.getTelefonoCliente() != null ? dto.getTelefonoCliente() : "PENDIENTE")
+                .estado(EstadoReserva.PENDIENTE_TEMPORAL)
+                .expiraAt(LocalDateTime.now().plusMinutes(3))
+                .build();
+
+        return reservaRepository.save(reserva);
     }
 }

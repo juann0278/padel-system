@@ -24,6 +24,7 @@ public class Reserva {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    private LocalDateTime expiraAt;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "cancha_id", nullable = false)

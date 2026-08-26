@@ -1,6 +1,7 @@
 package com.padel.turnero.model;
 
 public enum EstadoReserva {
+    PENDIENTE_TEMPORAL,
     PENDIENTE_PAGO,
     CONFIRMADO,
     CANCELADO,

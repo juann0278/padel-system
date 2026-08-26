@@ -49,6 +49,16 @@ public class ReservaController {
         }
     }
 
+    @PostMapping("/temporal")
+    public ResponseEntity<?> iniciarReservaTemporal(@RequestBody CrearReservaDTO dto) {
+        try {
+            Reserva reservaTemporal = reservaService.iniciarReservaTemporal(dto);
+            return ResponseEntity.ok(reservaTemporal); // Devuelve la reserva con su ID para usarlo al confirmar el pago
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/admin")
     public ResponseEntity<List<Reserva>> obtenerReservasAdmin(
             @RequestParam Long clubId,
@@ -62,6 +72,16 @@ public class ReservaController {
         try {
             reservaService.bloquearHorarioODia(dto);
             return ResponseEntity.ok("Bloqueo registrado correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PatchMapping("/temporal/{id}/liberar")
+    public ResponseEntity<?> liberarReservaTemporal(@PathVariable Long id) {
+        try {
+            reservaService.liberarReservaTemporal(id);
+            return ResponseEntity.ok("Turno liberado con éxito.");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
