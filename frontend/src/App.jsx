@@ -301,9 +301,9 @@ useEffect(() => {
       cargarSlots();
     } catch (err) {
       console.error("Error al iniciar reserva temporal:", err.response?.data);
+      cargarSlots();
       const msg = 'Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.';
       setMensaje({ tipo: 'error', texto: msg });
-      cargarSlots();
     }
   };
 
