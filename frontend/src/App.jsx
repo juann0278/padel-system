@@ -176,6 +176,7 @@ export default function App() {
   const [errorCarga, setErrorCarga] = useState(null);
 
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
+  const [guardandoTurno, setGuardandoTurno] = useState(false);
   const formRef = useRef(null);
 
   useEffect(() => {
@@ -284,11 +285,9 @@ export default function App() {
 
   // Bloqueo temporal de 3 minutos al hacer clic en un slot libre y despliegue del formulario
   const handleSeleccionarSlot = async (slot) => {
-    // Si ya hay una petición en curso o el slot no está disponible, salimos al toque
-    if (!slot.disponible || slot.cargando) return;
-
-    // Marcamos este slot temporalmente como "cargando" para bloquear clics repetidos
-    slot.cargando = true;
+    if (!slot.disponible || guardandoTurno) return;
+    
+    setGuardandoTurno(true); // 🔒 Bloquea toda la grilla al instante
 
     if (reservaTemporalId) {
       try {
@@ -308,21 +307,21 @@ export default function App() {
         nombreCliente: "Bloqueo Temporal",
         telefonoCliente: "PENDIENTE"
       });
-
+      
       setReservaTemporalId(res.data.id);
       setSlotSeleccionado(slot);
       cargarSlots();
-
     } catch (err) {
       console.error("Error al iniciar reserva temporal:", err.response?.data);
       cargarSlots();
-      const msg = 'Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.';
+      // Acá agarra perfecto el mensaje de error que manda tu backend
+      const msg = err.response?.data || 'Este horario está siendo seleccionado por otro usuario en este momento.';
       setMensaje({ tipo: 'error', texto: msg });
-
+      
       setSlotSeleccionado(null);
       setReservaTemporalId(null);
-      slot.cargando = false; // Liberamos el flag
-      return;
+    } finally {
+      setGuardandoTurno(false); // 🔓 Desbloquea para que pueda reintentar si falló
     }
   };
 
@@ -1389,20 +1388,21 @@ Acabo de reservar un turno por la web:
                   const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
                   return (
                     <button
-                      key={idx}
-                      disabled={!slot.disponible || slot.cargando}
-                      onClick={() => handleSeleccionarSlot(slot)}
-                      className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${(!slot.disponible || slot.cargando)
+                    key={idx}
+                    disabled={!slot.disponible || guardandoTurno}
+                    onClick={() => handleSeleccionarSlot(slot)}
+                    className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
+                      (!slot.disponible || guardandoTurno)
                           ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
                           : isSelected
-                            ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
-                            : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
-                        }`}
-                    >
-                      <span className="text-xs sm:text-sm">
-                        {slot.cargando ? "Cargando..." : `${slot.horaInicio?.slice(0, 5)} hs`}
-                      </span>
-                    </button>
+                          ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
+                          : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
+                    }`}
+                  >
+                    <span className="text-xs sm:text-sm">
+                      {guardandoTurno ? "Procesando..." : `${slot.horaInicio?.slice(0, 5)} hs`}
+                    </span>
+                  </button>
                   );
                 })}
               </div>
