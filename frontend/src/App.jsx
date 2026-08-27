@@ -252,7 +252,6 @@ export default function App() {
       .then(res => {
         const nuevosSlots = Array.isArray(res.data) ? res.data : [];
         setSlots(nuevosSlots);
-        // Dejamos el slot seleccionado fijo para que no desaparezca el formulario
       })
       .catch(() => setSlots([]));
   }, [canchaSeleccionada, fecha]);
@@ -287,7 +286,6 @@ useEffect(() => {
   const handleSeleccionarSlot = async (slot) => {
     if (!slot.disponible) return;
     
-    // Nos aseguramos que la hora vaya con segundos por si acaso
     const horaFormateada = slot.horaInicio.length === 5 ? `${slot.horaInicio}:00` : slot.horaInicio;
 
     try {
@@ -303,11 +301,7 @@ useEffect(() => {
       cargarSlots();
     } catch (err) {
       console.error("Error al iniciar reserva temporal:", err.response?.data);
-      
-      // Mensaje claro y transparente para el usuario en tiempo real
       const msg = 'Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.';
-      
-      // Mostramos la alerta prolija arriba en la interfaz
       setMensaje({ tipo: 'error', texto: msg });
       cargarSlots();
     }
@@ -355,6 +349,7 @@ useEffect(() => {
   };
 
   const handleConfirmarYEnviarWA = async () => {
+    if (cargando) return; // Frena cualquier doble clic por seguridad
     setCargando(true);
 
     const canchaObj = canchas.find(c => c.id === canchaSeleccionada);
@@ -747,7 +742,7 @@ Acabo de reservar un turno por la web:
                   className="w-full flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs uppercase tracking-wider py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 transition disabled:opacity-50 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 fill-current" />
-                  {cargando ? 'Registrando y abriendo WhatsApp...' : 'Enviar Confirmación por WhatsApp'}
+                  {cargando ? 'Procesando...' : 'Enviar Confirmación por WhatsApp'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
@@ -949,7 +944,7 @@ Acabo de reservar un turno por la web:
                   <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                     Rango de Horarios:
                   </label>
-                   
+                  
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     <button
                       type="button"
@@ -1137,156 +1132,153 @@ Acabo de reservar un turno por la web:
                   {ocultarCancelados ? <EyeOff className="w-3.5 h-3.5 text-zinc-500" /> : <Eye className="w-3.5 h-3.5 text-emerald-400" />}
                   <span>{ocultarCancelados ? 'Cancelados ocultos' : 'Cancelados visibles'}</span>
                 </button>
-              </div>
             </div>
+          </div>
 
-            {/* Grilla Visual 2x2 de Canchas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              {canchasConReservas.map((cancha) => (
-                <section 
-                  key={cancha.id}
-                  className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl flex flex-col justify-between"
-                >
-                  <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                    <div>
-                      <h3 className="font-black text-white text-base sm:text-lg">
-                        {cancha.nombre}
-                      </h3>
-                      <p className="text-xs text-emerald-400 font-semibold mt-0.5">
-                        {cancha.reservas.length} {cancha.reservas.length === 1 ? 'registro ocupado / bloqueado' : 'registros ocupados / bloqueados'}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => {
-                          setAdminCanchaId(cancha.id);
-                          setAdminCanchaFijada(true);
-                          setAdminFecha(fecha);
-                          setAdminError('');
-                          setMostrarModalCrearAdmin(true);
-                        }}
-                        title="Cargar turno en esta cancha"
-                        className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 text-zinc-300 hover:text-emerald-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
-                      >
-                        <PlusCircle className="w-3.5 h-3.5" /> Turno
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setBloqueoCanchaId(String(cancha.id));
-                          setBloqueoFecha(fecha);
-                          setBloqueoError('');
-                          setMostrarModalBloqueo(true);
-                        }}
-                        title="Bloquear esta cancha"
-                        className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-rose-500/50 text-zinc-300 hover:text-rose-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
-                      >
-                        <Ban className="w-3.5 h-3.5" /> Bloquear
-                      </button>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            {canchasConReservas.map((cancha) => (
+              <section 
+                key={cancha.id}
+                className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div>
+                    <h3 className="font-black text-white text-base sm:text-lg">
+                      {cancha.nombre}
+                    </h3>
+                    <p className="text-xs text-emerald-400 font-semibold mt-0.5">
+                      {cancha.reservas.length} {cancha.reservas.length === 1 ? 'registro ocupado / bloqueado' : 'registros ocupados / bloqueados'}
+                    </p>
                   </div>
 
-                  <div className="space-y-2.5 flex-1 min-h-[160px]">
-                    {cancha.reservas.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-zinc-800 rounded-2xl bg-zinc-950/40">
-                        <Clock className="w-7 h-7 text-zinc-700 mb-1.5" />
-                        <p className="text-xs font-semibold text-zinc-400">Sin reservas ni bloqueos para hoy</p>
-                        <p className="text-[11px] text-zinc-600 mt-0.5">Todos los horarios se encuentran disponibles</p>
-                      </div>
-                    ) : (
-                      cancha.reservas.map((reserva) => {
-                        const esBloqueado = reserva.estado === 'BLOQUEADO';
-                        const esCancelado = reserva.estado === 'CANCELADO';
-                        const esFijo = reserva.nombreCliente?.includes('(Fijo)');
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        setAdminCanchaId(cancha.id);
+                        setAdminCanchaFijada(true);
+                        setAdminFecha(fecha);
+                        setAdminError('');
+                        setMostrarModalCrearAdmin(true);
+                      }}
+                      title="Cargar turno en esta cancha"
+                      className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 text-zinc-300 hover:text-emerald-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> Turno
+                    </button>
 
-                        return (
-                          <div
-                            key={reserva.id}
-                            className={`p-3.5 rounded-2xl border transition flex flex-col gap-3 ${
-                              esBloqueado
-                                ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
-                                : esCancelado
-                                ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
-                                : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
-                            }`}
-                          >
-                            {/* Fila superior: Horario, Estado y Botones de acción */}
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-black text-xs sm:text-sm text-white flex items-center gap-1.5">
-                                  <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                                  {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
-                                </span>
-                                 
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                                  esBloqueado
-                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                    : reserva.estado === 'CONFIRMADO'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                                }`}>
-                                  {reserva.estado}
-                                </span>
-                              </div>
+                    <button
+                      onClick={() => {
+                        setBloqueoCanchaId(String(cancha.id));
+                        setBloqueoFecha(fecha);
+                        setBloqueoError('');
+                        setMostrarModalBloqueo(true);
+                      }}
+                      title="Bloquear esta cancha"
+                      className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-rose-500/50 text-zinc-300 hover:text-rose-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                    >
+                      <Ban className="w-3.5 h-3.5" /> Bloquear
+                    </button>
+                  </div>
+                </div>
 
-                              {reserva.estado !== 'CANCELADO' && (
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <button
-                                    onClick={() => handleCancelarReserva(reserva.id)}
-                                    className="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
-                                    title={esBloqueado ? 'Desbloquear' : 'Cancela únicamente este turno puntual'}
-                                  >
-                                    {esBloqueado ? 'Desbloquear' : 'Cancelar'}
-                                  </button>
+                <div className="space-y-2.5 flex-1 min-h-[160px]">
+                  {cancha.reservas.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-zinc-800 rounded-2xl bg-zinc-950/40">
+                      <Clock className="w-7 h-7 text-zinc-700 mb-1.5" />
+                      <p className="text-xs font-semibold text-zinc-400">Sin reservas ni bloqueos para hoy</p>
+                      <p className="text-[11px] text-zinc-600 mt-0.5">Todos los horarios se encuentran disponibles</p>
+                    </div>
+                  ) : (
+                    cancha.reservas.map((reserva) => {
+                      const esBloqueado = reserva.estado === 'BLOQUEADO';
+                      const esCancelado = reserva.estado === 'CANCELADO';
+                      const esFijo = reserva.nombreCliente?.includes('(Fijo)');
 
-                                  {esFijo && (
-                                    <button
-                                      onClick={() => handleCancelarCadena(reserva.id)}
-                                      className="text-[11px] bg-rose-900/40 hover:bg-rose-900/70 text-rose-300 border border-rose-700/50 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
-                                      title="Desfija y cancela todos los turnos futuros de este horario"
-                                    >
-                                      Desfijar Turno
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                      return (
+                        <div
+                          key={reserva.id}
+                          className={`p-3.5 rounded-2xl border transition flex flex-col gap-3 ${
+                            esBloqueado
+                              ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
+                              : esCancelado
+                              ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
+                              : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-black text-xs sm:text-sm text-white flex items-center gap-1.5">
+                                <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                                {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
+                              </span>
+                               
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                                esBloqueado
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  : reserva.estado === 'CONFIRMADO'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                              }`}>
+                                {reserva.estado}
+                              </span>
+                          </div>
 
-                            {/* Fila inferior: Datos del Cliente / Grupo y Botón Ver Comprobante */}
-                            <div className="text-xs flex items-center justify-between gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2 flex-wrap">
-                              <div className="flex items-center gap-1.5 truncate">
-                                <span className="font-semibold truncate">
-                                  {reserva.nombreCliente || 'Sin nombre'}
-                                </span>
-                                {reserva.telefonoCliente && (
-                                  <span className="text-zinc-500 text-[11px] truncate">
-                                    • {reserva.telefonoCliente}
-                                  </span>
-                                )}
-                              </div>
+                          {reserva.estado !== 'CANCELADO' && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                onClick={() => handleCancelarReserva(reserva.id)}
+                                className="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+                                title={esBloqueado ? 'Desbloquear' : 'Cancela únicamente este turno puntual'}
+                              >
+                                {esBloqueado ? 'Desbloquear' : 'Cancelar'}
+                              </button>
 
-                              {reserva.comprobanteImagen && (
+                              {esFijo && (
                                 <button
-                                  onClick={() => {
-                                    const baseURLSinApi = API_BASE.replace('/api/v1', '');
-                                    setImagenModalUrl(`${baseURLSinApi}/uploads/${reserva.comprobanteImagen}`);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer ml-auto"
+                                  onClick={() => handleCancelarCadena(reserva.id)}
+                                  className="text-[11px] bg-rose-900/40 hover:bg-rose-900/70 text-rose-300 border border-rose-700/50 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+                                  title="Desfija y cancela todos los turnos futuros de este horario"
                                 >
-                                  <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
+                                  Desfijar Turno
                                 </button>
                               )}
                             </div>
+                          )}
+                        </div>
+
+                        <div className="text-xs flex items-center justify-between gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="font-semibold truncate">
+                              {reserva.nombreCliente || 'Sin nombre'}
+                            </span>
+                            {reserva.telefonoCliente && (
+                              <span className="text-zinc-500 text-[11px] truncate">
+                                • {reserva.telefonoCliente}
+                              </span>
+                            )}
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </main>
+
+                          {reserva.comprobanteImagen && (
+                            <button
+                              onClick={() => {
+                                const baseURLSinApi = API_BASE.replace('/api/v1', '');
+                                setImagenModalUrl(`${baseURLSinApi}/uploads/${reserva.comprobanteImagen}`);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer ml-auto"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        </main>
         ) : (
           /* VISTA CLIENTE */
           <main className="space-y-4 sm:space-y-6">
@@ -1329,7 +1321,7 @@ Acabo de reservar un turno por la web:
                       className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer ${
                         isSelected
                             ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
-                            : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
                       }`}
                     >
                       <span className={`text-[9px] sm:text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-zinc-950' : 'text-zinc-400'}`}>
@@ -1389,7 +1381,7 @@ Acabo de reservar un turno por la web:
                   <button
                     key={idx}
                     disabled={!slot.disponible}
-                    onClick={() => handleSeleccionarSlot(slot)} // <--- ACÁ ESTABA EL SECRETO: Llama al método que hace el POST /temporal
+                    onClick={() => handleSeleccionarSlot(slot)}
                     className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
                       !slot.disponible
                           ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
@@ -1426,7 +1418,7 @@ Acabo de reservar un turno por la web:
                   <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Shield className="w-4 h-4" /> Datos de pago por transferencia
                   </p>
-                   
+                  
                   <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-zinc-500 block">ALIAS BANCARIO</span>
@@ -1484,7 +1476,7 @@ Acabo de reservar un turno por la web:
                   <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
                     Adjuntar Captura del Comprobante (Mercado Pago / Cuenta DNI) *
                   </label>
-                   
+                  
                   <div className="relative">
                     {!comprobanteArchivo ? (
                       <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-emerald-500/40 rounded-2xl bg-zinc-950/80 hover:bg-zinc-950 hover:border-emerald-400 transition cursor-pointer group">
