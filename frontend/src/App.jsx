@@ -284,6 +284,9 @@ useEffect(() => {
 
   // Bloqueo temporal de 3 minutos al hacer clic en un slot libre y despliegue del formulario
   const handleSeleccionarSlot = async (slot) => {
+    // 🔍 Poné este log acá arriba de todo:
+    console.log("👉 ¡ENTRÓ A LA FUNCIÓN CON EL SLOT!", slot);
+
     if (!slot.disponible) return;
     
     if (reservaTemporalId) {
@@ -305,20 +308,17 @@ useEffect(() => {
         telefonoCliente: "PENDIENTE"
       });
       
-      // 🛑 SI LLEGA ACÁ ES ÉXITO
       console.log("ÉXITO al reservar slot:", res.data);
       setReservaTemporalId(res.data.id);
       setSlotSeleccionado(slot);
       cargarSlots();
 
     } catch (err) {
-      // 🛑 SI LLEGA ACÁ ES ERROR
       console.error("--- CAPTURÓ ERROR EN CATCH ---", err.response);
       cargarSlots();
       const msg = err.response?.data || 'Este horario está siendo seleccionado por otro usuario en este momento.';
       setMensaje({ tipo: 'error', texto: msg });
       
-      // Cortamos por lo sano: asegurarnos de limpiar cualquier selección previa
       setSlotSeleccionado(null);
       return; 
     }
