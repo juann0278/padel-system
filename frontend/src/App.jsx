@@ -286,6 +286,15 @@ useEffect(() => {
   const handleSeleccionarSlot = async (slot) => {
     if (!slot.disponible) return;
     
+    // Si el usuario ya tenía otro slot seleccionado antes, liberamos ese bloqueo temporal anterior
+    if (reservaTemporalId) {
+      try {
+        await axios.patch(`${API_BASE}/reservas/temporal/${reservaTemporalId}/liberar`);
+      } catch (err) {
+        console.error("Error al liberar el temporal anterior", err);
+      }
+    }
+
     const horaFormateada = slot.horaInicio.length === 5 ? `${slot.horaInicio}:00` : slot.horaInicio;
 
     try {
