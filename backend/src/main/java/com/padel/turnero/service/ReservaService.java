@@ -208,7 +208,6 @@ public class ReservaService {
         List<Reserva> reservasFiltradas = new ArrayList<>();
         for (Reserva r : reservas) {
             if (r.getEstado() == EstadoReserva.PENDIENTE_TEMPORAL && r.getExpiraAt() != null && r.getExpiraAt().isBefore(ahora)) {
-                // Opcional: si querés que se borren físicamente de la base al expirar cuando el admin entra
                 reservaRepository.delete(r);
             } else {
                 reservasFiltradas.add(r);
@@ -239,12 +238,10 @@ public class ReservaService {
 
         List<LocalTime> horariosABloquear = new ArrayList<>();
 
-        // Validamos si la fecha a bloquear es el día de hoy y obtenemos la hora actual
         boolean esHoy = dto.getFecha().equals(LocalDate.now());
         LocalTime ahora = LocalTime.now();
 
         if (dto.getHoraInicio() == null) {
-            // Si bloquea el día completo, solo tomamos los horarios cuya hora de inicio sea actual o futura
             for (LocalTime h : todosLosHorarios) {
                 if (!esHoy || !h.isBefore(ahora)) {
                     horariosABloquear.add(h);
@@ -259,14 +256,12 @@ public class ReservaService {
                 }
             }
         } else {
-            // Si el admin elige un horario específico, validamos que su inicio no haya pasado
             if (esHoy && dto.getHoraInicio().isBefore(ahora)) {
                 throw new RuntimeException("No se puede bloquear un horario que ya comenzó o pasó.");
             }
             horariosABloquear.add(dto.getHoraInicio());
         }
 
-        // Si por esas casualidades tras filtrar no quedó ningún horario válido para bloquear, avisamos
         if (horariosABloquear.isEmpty()) {
             throw new RuntimeException("No hay horarios futuros disponibles para bloquear en el día seleccionado.");
         }
@@ -318,17 +313,15 @@ public class ReservaService {
     }
 
     @Autowired
-    private FileStorageService fileStorageService; // Inyectás el servicio de archivos
+    private FileStorageService fileStorageService;
 
     @Transactional
     public void confirmarPagoConImagen(Long reservaId, MultipartFile file) {
         Reserva reserva = reservaRepository.findById(reservaId)
                 .orElseThrow(() -> new RuntimeException("Reserva no encontrada"));
 
-        // Guardamos la imagen y obtenemos el nombre de archivo único
         String nombreArchivo = fileStorageService.guardarArchivo(file);
 
-        // Actualizamos la reserva
         reserva.setComprobanteImagen(nombreArchivo);
         reserva.setEstado(EstadoReserva.CONFIRMADO);
 
@@ -340,7 +333,6 @@ public class ReservaService {
         Reserva reservaBase = reservaRepository.findById(reservaId)
                 .orElseThrow(() -> new RuntimeException("Reserva no encontrada"));
 
-        // Usamos exactamente el nombre que tiene la reserva seleccionada (ej: "Juan Pérez (Fijo)")
         String nombreExacto = reservaBase.getNombreCliente();
 
         List<Reserva> turnosFuturos = reservaRepository.buscarTurnosFuturosFijos(
@@ -361,7 +353,7 @@ public class ReservaService {
         Cancha cancha = canchaRepository.findById(dto.getCanchaId())
                 .orElseThrow(() -> new RuntimeException("Cancha no encontrada"));
 
-        // Validar que no sea un horario pasado
+        // 1. Validar que no sea un horario pasado
         if (dto.getFecha().equals(LocalDate.now()) && dto.getHoraInicio().isBefore(LocalTime.now())) {
             throw new RuntimeException("No se pueden seleccionar horarios pasados.");
         }
@@ -370,28 +362,27 @@ public class ReservaService {
                 ? LocalTime.of(23, 59, 59)
                 : dto.getHoraInicio().plusMinutes(90);
 
-        // Verificar si ya está ocupado (ya sea confirmado, bloqueado, fijo o con un temporal vigente)
-        // Opcional: Podés crear un método en el repositorio que verifique solapamientos considerando expiración
+        // 2. Verificación estricta de solapamiento en base de datos (Incluye temporales vigentes, confirmados, etc.)
         boolean solapa = reservaRepository.existeSolapamiento(
                 cancha.getId(), dto.getFecha(), dto.getHoraInicio(), horaFin, EstadoReserva.CANCELADO
         );
 
         if (solapa) {
-            throw new RuntimeException("El turno ya no está disponible, fue tomado por otro usuario.");
+            throw new RuntimeException("Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.");
         }
 
-        // Buscamos si ya existe un registro previo para esa cancha/fecha/hora (por ejemplo, uno viejo que expiró)
+        // 3. Buscamos si ya existe un registro previo exacto para esa cancha/fecha/hora (ej: uno viejo expirado)
         Optional<Reserva> existenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
                 cancha.getId(), dto.getFecha(), dto.getHoraInicio()
         );
 
         if (existenteOpt.isPresent()) {
             Reserva r = existenteOpt.get();
-            // Si ya está confirmado o bloqueado posta, no se puede
+            // Doble chequeo de seguridad por si el estado es firme
             if (r.getEstado() == EstadoReserva.CONFIRMADO || r.getEstado() == EstadoReserva.BLOQUEADO || r.getEstado() == EstadoReserva.FIJO) {
-                throw new RuntimeException("El turno ya se encuentra ocupado.");
+                throw new RuntimeException("Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.");
             }
-            // Si era un temporal vencido o cancelado, lo reciclamos y le damos 3 minutos nuevos
+            // Si estaba cancelado o expirado, lo reciclamos como temporal nuevo por 3 minutos
             r.setNombreCliente(dto.getNombreCliente() != null ? dto.getNombreCliente() : "Bloqueo Temporal");
             r.setTelefonoCliente(dto.getTelefonoCliente() != null ? dto.getTelefonoCliente() : "PENDIENTE");
             r.setEstado(EstadoReserva.PENDIENTE_TEMPORAL);
@@ -400,7 +391,7 @@ public class ReservaService {
             return reservaRepository.save(r);
         }
 
-        // Si no existe, creamos uno nuevo temporal
+        // 4. Si está totalmente libre, creamos un nuevo registro temporal por 3 minutos
         Reserva reserva = Reserva.builder()
                 .cancha(cancha)
                 .fecha(dto.getFecha())
