@@ -239,16 +239,36 @@ public class ReservaService {
 
         List<LocalTime> horariosABloquear = new ArrayList<>();
 
+        // Validamos si la fecha a bloquear es el día de hoy y obtenemos la hora actual
+        boolean esHoy = dto.getFecha().equals(LocalDate.now());
+        LocalTime ahora = LocalTime.now();
+
         if (dto.getHoraInicio() == null) {
-            horariosABloquear.addAll(todosLosHorarios);
-        } else if (dto.isHastaElCierre()) {
+            // Si bloquea el día completo, solo tomamos los horarios que todavía no pasaron
             for (LocalTime h : todosLosHorarios) {
-                if (!h.isBefore(dto.getHoraInicio())) {
+                if (!esHoy || !h.isBefore(ahora.minusMinutes(90))) { // Si el turno ya arrancó o es futuro
                     horariosABloquear.add(h);
                 }
             }
+        } else if (dto.isHastaElCierre()) {
+            for (LocalTime h : todosLosHorarios) {
+                if (!h.isBefore(dto.getHoraInicio())) {
+                    if (!esHoy || !h.isBefore(ahora.minusMinutes(90))) {
+                        horariosABloquear.add(h);
+                    }
+                }
+            }
         } else {
+            // Si el admin elige un horario específico, validamos que no sea un turno pasado del día de hoy
+            if (esHoy && dto.getHoraInicio().isBefore(ahora.minusMinutes(90))) {
+                throw new RuntimeException("No se puede bloquear un horario que ya pasó.");
+            }
             horariosABloquear.add(dto.getHoraInicio());
+        }
+
+        // Si por esas casualidades tras filtrar no quedó ningún horario válido para bloquear, avisamos
+        if (horariosABloquear.isEmpty()) {
+            throw new RuntimeException("No hay horarios futuros disponibles para bloquear en el día seleccionado.");
         }
 
         List<Cancha> canchasABloquear = new ArrayList<>();
@@ -273,7 +293,9 @@ public class ReservaService {
 
                 if (reservaExistenteOpt.isPresent()) {
                     Reserva r = reservaExistenteOpt.get();
-                    if (r.getEstado() == EstadoReserva.CANCELADO || r.getEstado() == EstadoReserva.BLOQUEADO) {
+                    // Ojo acá: si ya estaba CONFIRMADO o FIJO por un cliente, idealmente no pisarlo con un bloqueo de admin a menos que se quiera,
+                    // pero mantenemos tu lógica original de estados permitidos:
+                    if (r.getEstado() == EstadoReserva.CANCELADO || r.getEstado() == EstadoReserva.BLOQUEADO || r.getEstado() == EstadoReserva.PENDIENTE_TEMPORAL) {
                         r.setEstado(EstadoReserva.BLOQUEADO);
                         r.setNombreCliente("⛔ " + motivo);
                         r.setTelefonoCliente("ADMIN");
