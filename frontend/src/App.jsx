@@ -176,7 +176,6 @@ export default function App() {
   const [errorCarga, setErrorCarga] = useState(null);
 
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
-  const [guardandoTurno, setGuardandoTurno] = useState(false);
   const formRef = useRef(null);
 
   useEffect(() => {
@@ -285,9 +284,7 @@ export default function App() {
 
   // Bloqueo temporal de 3 minutos al hacer clic en un slot libre y despliegue del formulario
   const handleSeleccionarSlot = async (slot) => {
-    if (!slot.disponible || guardandoTurno) return;
-    
-    setGuardandoTurno(true); // 🔒 Bloquea toda la grilla al instante
+    if (!slot.disponible) return;
 
     if (reservaTemporalId) {
       try {
@@ -311,17 +308,15 @@ export default function App() {
       setReservaTemporalId(res.data.id);
       setSlotSeleccionado(slot);
       cargarSlots();
+
     } catch (err) {
       console.error("Error al iniciar reserva temporal:", err.response?.data);
       cargarSlots();
-      // Acá agarra perfecto el mensaje de error que manda tu backend
       const msg = err.response?.data || 'Este horario está siendo seleccionado por otro usuario en este momento.';
       setMensaje({ tipo: 'error', texto: msg });
       
       setSlotSeleccionado(null);
       setReservaTemporalId(null);
-    } finally {
-      setGuardandoTurno(false); // 🔓 Desbloquea para que pueda reintentar si falló
     }
   };
 
@@ -968,8 +963,8 @@ Acabo de reservar un turno por la web:
                       type="button"
                       onClick={() => setTipoBloqueoHorario('DIA_COMPLETO')}
                       className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DIA_COMPLETO'
-                          ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                         }`}
                     >
                       Día Completo
@@ -979,8 +974,8 @@ Acabo de reservar un turno por la web:
                       type="button"
                       onClick={() => setTipoBloqueoHorario('DESDE_HORA')}
                       className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DESDE_HORA'
-                          ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                         }`}
                     >
                       Desde hora
@@ -990,8 +985,8 @@ Acabo de reservar un turno por la web:
                       type="button"
                       onClick={() => setTipoBloqueoHorario('SOLO_TURNO')}
                       className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'SOLO_TURNO'
-                          ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                         }`}
                     >
                       Solo 1 Turno
@@ -1139,8 +1134,8 @@ Acabo de reservar un turno por la web:
                 <button
                   onClick={() => setOcultarCancelados(!ocultarCancelados)}
                   className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${!ocultarCancelados
-                      ? 'bg-zinc-900 border-emerald-500/50 text-emerald-400'
-                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-zinc-900 border-emerald-500/50 text-emerald-400'
+                    : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
                     }`}
                 >
                   {ocultarCancelados ? <EyeOff className="w-3.5 h-3.5 text-zinc-500" /> : <Eye className="w-3.5 h-3.5 text-emerald-400" />}
@@ -1212,10 +1207,10 @@ Acabo de reservar un turno por la web:
                           <div
                             key={reserva.id}
                             className={`p-3.5 rounded-2xl border transition flex flex-col gap-3 ${esBloqueado
-                                ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
-                                : esCancelado
-                                  ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
-                                  : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
+                              ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
+                              : esCancelado
+                                ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
+                                : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
                               }`}
                           >
                             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1226,10 +1221,10 @@ Acabo de reservar un turno por la web:
                                 </span>
 
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${esBloqueado
-                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                    : reserva.estado === 'CONFIRMADO'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  : reserva.estado === 'CONFIRMADO'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
                                   }`}>
                                   {reserva.estado}
                                 </span>
@@ -1296,8 +1291,8 @@ Acabo de reservar un turno por la web:
           <main className="space-y-4 sm:space-y-6">
             {mensaje && (
               <div className={`p-4 sm:p-5 rounded-3xl border shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${mensaje.tipo === 'exito'
-                  ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200'
-                  : 'bg-rose-950/95 border-rose-800 text-rose-300'
+                ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200'
+                : 'bg-rose-950/95 border-rose-800 text-rose-300'
                 }`}>
                 <div className="flex items-center gap-3">
                   {mensaje.tipo === 'exito' ? (
@@ -1330,8 +1325,8 @@ Acabo de reservar un turno por la web:
                       key={d.fechaISO}
                       onClick={() => setFecha(d.fechaISO)}
                       className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer ${isSelected
-                          ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
-                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                        ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
+                        : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
                         }`}
                     >
                       <span className={`text-[9px] sm:text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-zinc-950' : 'text-zinc-400'}`}>
@@ -1360,8 +1355,8 @@ Acabo de reservar un turno por la web:
                       key={c.id}
                       onClick={() => setCanchaSeleccionada(c.id)}
                       className={`p-3.5 sm:p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${isSelected
-                          ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg'
-                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                        ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg'
+                        : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
                         }`}
                     >
                       <div>
@@ -1388,21 +1383,18 @@ Acabo de reservar un turno por la web:
                   const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
                   return (
                     <button
-                    key={idx}
-                    disabled={!slot.disponible || guardandoTurno}
-                    onClick={() => handleSeleccionarSlot(slot)}
-                    className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
-                      (!slot.disponible || guardandoTurno)
+                      key={idx}
+                      disabled={!slot.disponible}
+                      onClick={() => handleSeleccionarSlot(slot)}
+                      className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${!slot.disponible
                           ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
                           : isSelected
-                          ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
-                          : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
-                    }`}
-                  >
-                    <span className="text-xs sm:text-sm">
-                      {guardandoTurno ? "Procesando..." : `${slot.horaInicio?.slice(0, 5)} hs`}
-                    </span>
-                  </button>
+                            ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
+                            : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
+                        }`}
+                    >
+                      <span className="text-xs sm:text-sm">{slot.horaInicio?.slice(0, 5)} hs</span>
+                    </button>
                   );
                 })}
               </div>
