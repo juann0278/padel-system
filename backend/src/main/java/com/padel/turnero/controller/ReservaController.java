@@ -53,8 +53,9 @@ public class ReservaController {
     public ResponseEntity<?> iniciarReservaTemporal(@RequestBody CrearReservaDTO dto) {
         try {
             Reserva reservaTemporal = reservaService.iniciarReservaTemporal(dto);
-            return ResponseEntity.ok(reservaTemporal); // Devuelve la reserva con su ID para usarlo al confirmar el pago
+            return ResponseEntity.ok(reservaTemporal);
         } catch (Exception e) {
+            e.printStackTrace(); // <--- ¡Imprimime esto en la consola de Java cuando pase!
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
