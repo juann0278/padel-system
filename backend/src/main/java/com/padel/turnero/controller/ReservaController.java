@@ -55,8 +55,14 @@ public class ReservaController {
             Reserva reservaTemporal = reservaService.iniciarReservaTemporal(dto);
             return ResponseEntity.ok(reservaTemporal);
         } catch (Exception e) {
-            e.printStackTrace(); // <--- ¡Imprimime esto en la consola de Java cuando pase!
-            return ResponseEntity.badRequest().body(e.getMessage());
+            // Verificamos si el error viene de la base de datos (por el índice único)
+            String mensajeError = e.getMessage().toLowerCase();
+            if (mensajeError.contains("violates unique constraint") || mensajeError.contains("idx_cancha_fecha_hora_activa")) {
+                return ResponseEntity.badRequest().body("El turno está siendo confirmado por otro cliente en este momento.");
+            }
+
+            // Si es otro error genérico
+            return ResponseEntity.badRequest().body("No se pudo procesar la reserva temporal.");
         }
     }
 
