@@ -269,7 +269,7 @@ export default function App() {
   useEffect(() => {
     if (!vistaAdmin && canchaSeleccionada && fecha) {
       cargarSlots();
-      const intervalId = setInterval(cargarSlots, 2000); // Actualiza cada 5 segundos
+      const intervalId = setInterval(cargarSlots, 1000); // Actualiza cada 1 segundos
       return () => clearInterval(intervalId);
     }
   }, [vistaAdmin, canchaSeleccionada, fecha, cargarSlots]);
