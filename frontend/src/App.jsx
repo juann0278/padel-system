@@ -284,11 +284,9 @@ useEffect(() => {
 
   // Bloqueo temporal de 3 minutos al hacer clic en un slot libre y despliegue del formulario
   const handleSeleccionarSlot = async (slot) => {
-    // 🔍 Poné este log acá arriba de todo:
-    console.log("👉 ¡ENTRÓ A LA FUNCIÓN CON EL SLOT!", slot);
-
     if (!slot.disponible) return;
     
+    // Si el usuario ya tenía otro slot seleccionado antes, liberamos ese bloqueo temporal anterior
     if (reservaTemporalId) {
       try {
         await axios.patch(`${API_BASE}/reservas/temporal/${reservaTemporalId}/liberar`);
@@ -308,18 +306,24 @@ useEffect(() => {
         telefonoCliente: "PENDIENTE"
       });
       
-      console.log("ÉXITO al reservar slot:", res.data);
+      // ✅ SI EL BACKEND DIÓ OK: Guardamos el ID, seleccionamos el slot y ACÁ RECIÉN HACES EL SCROLL O AVANZÁS AL FORM
       setReservaTemporalId(res.data.id);
       setSlotSeleccionado(slot);
       cargarSlots();
 
+      // (Si tu scroll automático está acá adentro, ponelo solo en este bloque de éxito)
+      // ejemplo: 
+      // document.getElementById('seccion-formulario')?.scrollIntoView({ behavior: 'smooth' });
+
     } catch (err) {
-      console.error("--- CAPTURÓ ERROR EN CATCH ---", err.response);
+      console.error("Error al iniciar reserva temporal:", err.response?.data);
       cargarSlots();
-      const msg = err.response?.data || 'Este horario está siendo seleccionado por otro usuario en este momento.';
+      const msg = 'Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.';
       setMensaje({ tipo: 'error', texto: msg });
       
+      // 🛑 SI DA ERROR: Limpiamos todo, NO avanzamos y nos quedamos arriba
       setSlotSeleccionado(null);
+      setReservaTemporalId(null);
       return; 
     }
   };
