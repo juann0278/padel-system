@@ -1,28 +1,28 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { 
-  Clock, 
-  MapPin, 
-  Phone, 
-  CheckCircle2, 
-  AlertCircle, 
-  Shield, 
-  User, 
-  Lock, 
-  LogOut, 
-  PlusCircle, 
-  X, 
-  Filter, 
-  MessageCircle, 
-  ArrowRight, 
-  Calendar, 
-  Repeat, 
-  Trophy, 
-  Ban, 
-  Moon, 
-  Eye, 
-  EyeOff, 
-  RefreshCw, 
+import {
+  Clock,
+  MapPin,
+  Phone,
+  CheckCircle2,
+  AlertCircle,
+  Shield,
+  User,
+  Lock,
+  LogOut,
+  PlusCircle,
+  X,
+  Filter,
+  MessageCircle,
+  ArrowRight,
+  Calendar,
+  Repeat,
+  Trophy,
+  Ban,
+  Moon,
+  Eye,
+  EyeOff,
+  RefreshCw,
   Info,
   Image as ImageIcon
 } from 'lucide-react';
@@ -136,14 +136,14 @@ export default function App() {
   const [club, setClub] = useState(null);
   const [canchas, setCanchas] = useState([]);
   const [canchaSeleccionada, setCanchaSeleccionada] = useState(null);
-  
+
   const hoyISO = obtenerFechaLocalISO(new Date());
   const [fecha, setFecha] = useState(hoyISO);
-  
+
   const [slots, setSlots] = useState([]);
   const [slotSeleccionado, setSlotSeleccionado] = useState(null);
   const [reservaTemporalId, setReservaTemporalId] = useState(null);
-  
+
   const [reservasAdmin, setReservasAdmin] = useState([]);
   const [ocultarCancelados, setOcultarCancelados] = useState(true);
 
@@ -266,7 +266,7 @@ export default function App() {
       .catch(() => setReservasAdmin([]));
   }, [club?.id, fecha]);
 
-useEffect(() => {
+  useEffect(() => {
     if (!vistaAdmin && canchaSeleccionada && fecha) {
       cargarSlots();
       const intervalId = setInterval(cargarSlots, 2000); // Actualiza cada 5 segundos
@@ -284,9 +284,12 @@ useEffect(() => {
 
   // Bloqueo temporal de 3 minutos al hacer clic en un slot libre y despliegue del formulario
   const handleSeleccionarSlot = async (slot) => {
-    if (!slot.disponible) return;
-    
-    // Si el usuario ya tenía otro slot seleccionado antes, liberamos ese bloqueo temporal anterior
+    // Si ya hay una petición en curso o el slot no está disponible, salimos al toque
+    if (!slot.disponible || slot.cargando) return;
+
+    // Marcamos este slot temporalmente como "cargando" para bloquear clics repetidos
+    slot.cargando = true;
+
     if (reservaTemporalId) {
       try {
         await axios.patch(`${API_BASE}/reservas/temporal/${reservaTemporalId}/liberar`);
@@ -305,26 +308,21 @@ useEffect(() => {
         nombreCliente: "Bloqueo Temporal",
         telefonoCliente: "PENDIENTE"
       });
-      
-      // ✅ SI EL BACKEND DIÓ OK: Guardamos el ID, seleccionamos el slot y ACÁ RECIÉN HACES EL SCROLL O AVANZÁS AL FORM
+
       setReservaTemporalId(res.data.id);
       setSlotSeleccionado(slot);
       cargarSlots();
-
-      // (Si tu scroll automático está acá adentro, ponelo solo en este bloque de éxito)
-      // ejemplo: 
-      // document.getElementById('seccion-formulario')?.scrollIntoView({ behavior: 'smooth' });
 
     } catch (err) {
       console.error("Error al iniciar reserva temporal:", err.response?.data);
       cargarSlots();
       const msg = 'Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.';
       setMensaje({ tipo: 'error', texto: msg });
-      
-      // 🛑 SI DA ERROR: Limpiamos todo, NO avanzamos y nos quedamos arriba
+
       setSlotSeleccionado(null);
       setReservaTemporalId(null);
-      return; 
+      slot.cargando = false; // Liberamos el flag
+      return;
     }
   };
 
@@ -378,8 +376,8 @@ useEffect(() => {
     const nombreFinal = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
     const telFinal = telefono.replace(/\D/g, '').trim();
 
-    const textoMensaje = 
-`¡Hola ${club?.nombre || 'Murcielago Padel'}! 👋
+    const textoMensaje =
+      `¡Hola ${club?.nombre || 'Murcielago Padel'}! 👋
 Acabo de reservar un turno por la web:
 
 🎾 *Cancha:* ${canchaNombre}
@@ -582,10 +580,10 @@ Acabo de reservar un turno por la web:
 
   return (
     <div className="relative min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500 selection:text-zinc-950 overflow-x-hidden">
-      
+
       {/* FONDO */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-zinc-950">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-100"
           style={{ backgroundImage: `url(${FONDO})` }}
         />
@@ -593,7 +591,7 @@ Acabo de reservar un turno por la web:
       </div>
 
       <div className="relative z-10 p-3 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
-        
+
         {/* Barra superior */}
         <header className="flex items-start justify-between bg-zinc-900/95 border border-zinc-800 p-4 sm:p-5 rounded-3xl shadow-xl gap-3">
           <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -604,16 +602,16 @@ Acabo de reservar un turno por la web:
               <h1 className="text-base sm:text-2xl font-black tracking-tight text-white truncate leading-tight">
                 {club.nombre}
               </h1>
-              
+
               <div className="flex items-start gap-1.5 mt-1">
-                <MapPin className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0 mt-0.5" /> 
+                <MapPin className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0 mt-0.5" />
                 <span className="text-[11px] sm:text-xs text-zinc-400 leading-snug break-words">
                   {club.direccion}
                 </span>
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 flex-shrink-0">
             {vistaAdmin ? (
               <>
@@ -650,7 +648,7 @@ Acabo de reservar un turno por la web:
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-emerald-400" /> Comprobante de Transferencia
                 </h3>
-                <button 
+                <button
                   onClick={() => setImagenModalUrl(null)}
                   className="p-1 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
                 >
@@ -659,9 +657,9 @@ Acabo de reservar un turno por la web:
               </div>
 
               <div className="bg-zinc-950 p-2 rounded-2xl border border-zinc-800 max-h-[70vh] flex items-center justify-center overflow-hidden">
-                <img 
-                  src={imagenModalUrl} 
-                  alt="Comprobante de pago" 
+                <img
+                  src={imagenModalUrl}
+                  alt="Comprobante de pago"
                   className="max-h-[60vh] object-contain rounded-xl"
                 />
               </div>
@@ -789,7 +787,7 @@ Acabo de reservar un turno por la web:
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-base sm:text-lg">
                   <PlusCircle className="w-5 h-5" /> Cargar Turno
                 </div>
-                <button 
+                <button
                   onClick={() => setMostrarModalCrearAdmin(false)}
                   className="p-1 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition"
                 >
@@ -919,10 +917,10 @@ Acabo de reservar un turno por la web:
             <div className="bg-zinc-900 border border-zinc-800 p-5 sm:p-6 rounded-3xl max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-rose-400 font-bold text-base sm:text-lg">
-                  <Ban className="w-5 h-5" /> 
+                  <Ban className="w-5 h-5" />
                   {bloqueoCanchaId === '0' ? 'Bloquear Complejo (Todas)' : 'Bloquear Cancha'}
                 </div>
-                <button 
+                <button
                   onClick={() => setMostrarModalBloqueo(false)}
                   className="p-1 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition"
                 >
@@ -965,16 +963,15 @@ Acabo de reservar un turno por la web:
                   <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                     Rango de Horarios:
                   </label>
-                  
+
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => setTipoBloqueoHorario('DIA_COMPLETO')}
-                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${
-                        tipoBloqueoHorario === 'DIA_COMPLETO'
+                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DIA_COMPLETO'
                           ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
                           : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                      }`}
+                        }`}
                     >
                       Día Completo
                     </button>
@@ -982,11 +979,10 @@ Acabo de reservar un turno por la web:
                     <button
                       type="button"
                       onClick={() => setTipoBloqueoHorario('DESDE_HORA')}
-                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${
-                        tipoBloqueoHorario === 'DESDE_HORA'
+                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DESDE_HORA'
                           ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
                           : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                      }`}
+                        }`}
                     >
                       Desde hora
                     </button>
@@ -994,11 +990,10 @@ Acabo de reservar un turno por la web:
                     <button
                       type="button"
                       onClick={() => setTipoBloqueoHorario('SOLO_TURNO')}
-                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${
-                        tipoBloqueoHorario === 'SOLO_TURNO'
+                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'SOLO_TURNO'
                           ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
                           : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                      }`}
+                        }`}
                     >
                       Solo 1 Turno
                     </button>
@@ -1127,7 +1122,7 @@ Acabo de reservar un turno por la web:
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Fecha de planilla:
                   </label>
-                  
+
                   <div className="relative">
                     <input
                       type="date"
@@ -1144,171 +1139,167 @@ Acabo de reservar un turno por la web:
 
                 <button
                   onClick={() => setOcultarCancelados(!ocultarCancelados)}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                    !ocultarCancelados
+                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${!ocultarCancelados
                       ? 'bg-zinc-900 border-emerald-500/50 text-emerald-400'
                       : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
-                  }`}
+                    }`}
                 >
                   {ocultarCancelados ? <EyeOff className="w-3.5 h-3.5 text-zinc-500" /> : <Eye className="w-3.5 h-3.5 text-emerald-400" />}
                   <span>{ocultarCancelados ? 'Cancelados ocultos' : 'Cancelados visibles'}</span>
                 </button>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            {canchasConReservas.map((cancha) => (
-              <section 
-                key={cancha.id}
-                className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl flex flex-col justify-between"
-              >
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                  <div>
-                    <h3 className="font-black text-white text-base sm:text-lg">
-                      {cancha.nombre}
-                    </h3>
-                    <p className="text-xs text-emerald-400 font-semibold mt-0.5">
-                      {cancha.reservas.length} {cancha.reservas.length === 1 ? 'registro ocupado / bloqueado' : 'registros ocupados / bloqueados'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => {
-                        setAdminCanchaId(cancha.id);
-                        setAdminCanchaFijada(true);
-                        setAdminFecha(fecha);
-                        setAdminError('');
-                        setMostrarModalCrearAdmin(true);
-                      }}
-                      title="Cargar turno en esta cancha"
-                      className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 text-zinc-300 hover:text-emerald-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" /> Turno
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setBloqueoCanchaId(String(cancha.id));
-                        setBloqueoFecha(fecha);
-                        setBloqueoError('');
-                        setMostrarModalBloqueo(true);
-                      }}
-                      title="Bloquear esta cancha"
-                      className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-rose-500/50 text-zinc-300 hover:text-rose-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
-                    >
-                      <Ban className="w-3.5 h-3.5" /> Bloquear
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 flex-1 min-h-[160px]">
-                  {cancha.reservas.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-zinc-800 rounded-2xl bg-zinc-950/40">
-                      <Clock className="w-7 h-7 text-zinc-700 mb-1.5" />
-                      <p className="text-xs font-semibold text-zinc-400">Sin reservas ni bloqueos para hoy</p>
-                      <p className="text-[11px] text-zinc-600 mt-0.5">Todos los horarios se encuentran disponibles</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {canchasConReservas.map((cancha) => (
+                <section
+                  key={cancha.id}
+                  className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                    <div>
+                      <h3 className="font-black text-white text-base sm:text-lg">
+                        {cancha.nombre}
+                      </h3>
+                      <p className="text-xs text-emerald-400 font-semibold mt-0.5">
+                        {cancha.reservas.length} {cancha.reservas.length === 1 ? 'registro ocupado / bloqueado' : 'registros ocupados / bloqueados'}
+                      </p>
                     </div>
-                  ) : (
-                    cancha.reservas.map((reserva) => {
-                      const esBloqueado = reserva.estado === 'BLOQUEADO';
-                      const esCancelado = reserva.estado === 'CANCELADO';
-                      const esFijo = reserva.nombreCliente?.includes('(Fijo)');
 
-                      return (
-                        <div
-                          key={reserva.id}
-                          className={`p-3.5 rounded-2xl border transition flex flex-col gap-3 ${
-                            esBloqueado
-                              ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
-                              : esCancelado
-                              ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
-                              : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-black text-xs sm:text-sm text-white flex items-center gap-1.5">
-                                <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                                {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
-                              </span>
-                               
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                                esBloqueado
-                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                  : reserva.estado === 'CONFIRMADO'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                              }`}>
-                                {reserva.estado}
-                              </span>
-                          </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setAdminCanchaId(cancha.id);
+                          setAdminCanchaFijada(true);
+                          setAdminFecha(fecha);
+                          setAdminError('');
+                          setMostrarModalCrearAdmin(true);
+                        }}
+                        title="Cargar turno en esta cancha"
+                        className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 text-zinc-300 hover:text-emerald-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" /> Turno
+                      </button>
 
-                          {reserva.estado !== 'CANCELADO' && (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <button
-                                onClick={() => handleCancelarReserva(reserva.id)}
-                                className="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
-                                title={esBloqueado ? 'Desbloquear' : 'Cancela únicamente este turno puntual'}
-                              >
-                                {esBloqueado ? 'Desbloquear' : 'Cancelar'}
-                              </button>
+                      <button
+                        onClick={() => {
+                          setBloqueoCanchaId(String(cancha.id));
+                          setBloqueoFecha(fecha);
+                          setBloqueoError('');
+                          setMostrarModalBloqueo(true);
+                        }}
+                        title="Bloquear esta cancha"
+                        className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-rose-500/50 text-zinc-300 hover:text-rose-400 transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                      >
+                        <Ban className="w-3.5 h-3.5" /> Bloquear
+                      </button>
+                    </div>
+                  </div>
 
-                              {esFijo && (
+                  <div className="space-y-2.5 flex-1 min-h-[160px]">
+                    {cancha.reservas.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-zinc-800 rounded-2xl bg-zinc-950/40">
+                        <Clock className="w-7 h-7 text-zinc-700 mb-1.5" />
+                        <p className="text-xs font-semibold text-zinc-400">Sin reservas ni bloqueos para hoy</p>
+                        <p className="text-[11px] text-zinc-600 mt-0.5">Todos los horarios se encuentran disponibles</p>
+                      </div>
+                    ) : (
+                      cancha.reservas.map((reserva) => {
+                        const esBloqueado = reserva.estado === 'BLOQUEADO';
+                        const esCancelado = reserva.estado === 'CANCELADO';
+                        const esFijo = reserva.nombreCliente?.includes('(Fijo)');
+
+                        return (
+                          <div
+                            key={reserva.id}
+                            className={`p-3.5 rounded-2xl border transition flex flex-col gap-3 ${esBloqueado
+                                ? 'bg-rose-950/20 border-rose-900/50 text-rose-200'
+                                : esCancelado
+                                  ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
+                                  : 'bg-zinc-950/70 border-zinc-800/90 text-zinc-200'
+                              }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-xs sm:text-sm text-white flex items-center gap-1.5">
+                                  <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                                  {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
+                                </span>
+
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${esBloqueado
+                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                    : reserva.estado === 'CONFIRMADO'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                                  }`}>
+                                  {reserva.estado}
+                                </span>
+                              </div>
+
+                              {reserva.estado !== 'CANCELADO' && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <button
+                                    onClick={() => handleCancelarReserva(reserva.id)}
+                                    className="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+                                    title={esBloqueado ? 'Desbloquear' : 'Cancela únicamente este turno puntual'}
+                                  >
+                                    {esBloqueado ? 'Desbloquear' : 'Cancelar'}
+                                  </button>
+
+                                  {esFijo && (
+                                    <button
+                                      onClick={() => handleCancelarCadena(reserva.id)}
+                                      className="text-[11px] bg-rose-900/40 hover:bg-rose-900/70 text-rose-300 border border-rose-700/50 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+                                      title="Desfija y cancela todos los turnos futuros de este horario"
+                                    >
+                                      Desfijar Turno
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="text-xs flex items-center justify-between gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2 flex-wrap">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span className="font-semibold truncate">
+                                  {reserva.nombreCliente || 'Sin nombre'}
+                                </span>
+                                {reserva.telefonoCliente && (
+                                  <span className="text-zinc-500 text-[11px] truncate">
+                                    • {reserva.telefonoCliente}
+                                  </span>
+                                )}
+                              </div>
+
+                              {reserva.comprobanteImagen && (
                                 <button
-                                  onClick={() => handleCancelarCadena(reserva.id)}
-                                  className="text-[11px] bg-rose-900/40 hover:bg-rose-900/70 text-rose-300 border border-rose-700/50 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
-                                  title="Desfija y cancela todos los turnos futuros de este horario"
+                                  onClick={() => {
+                                    const baseURLSinApi = API_BASE.replace('/api/v1', '');
+                                    setImagenModalUrl(`${baseURLSinApi}/uploads/${reserva.comprobanteImagen}`);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer ml-auto"
                                 >
-                                  Desfijar Turno
+                                  <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
                                 </button>
                               )}
                             </div>
-                          )}
-                        </div>
-
-                        <div className="text-xs flex items-center justify-between gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2 flex-wrap">
-                          <div className="flex items-center gap-1.5 truncate">
-                            <span className="font-semibold truncate">
-                              {reserva.nombreCliente || 'Sin nombre'}
-                            </span>
-                            {reserva.telefonoCliente && (
-                              <span className="text-zinc-500 text-[11px] truncate">
-                                • {reserva.telefonoCliente}
-                              </span>
-                            )}
                           </div>
-
-                          {reserva.comprobanteImagen && (
-                            <button
-                              onClick={() => {
-                                const baseURLSinApi = API_BASE.replace('/api/v1', '');
-                                setImagenModalUrl(`${baseURLSinApi}/uploads/${reserva.comprobanteImagen}`);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer ml-auto"
-                            >
-                              <ImageIcon className="w-3.5 h-3.5" /> Ver Comprobante
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      );
-                    })
-                  )}
-                </div>
-              </section>
-            ))}
-          </div>
-        </main>
+                        );
+                      })
+                    )}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </main>
         ) : (
           /* VISTA CLIENTE */
           <main className="space-y-4 sm:space-y-6">
             {mensaje && (
-              <div className={`p-4 sm:p-5 rounded-3xl border shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${
-                mensaje.tipo === 'exito' 
-                  ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200' 
+              <div className={`p-4 sm:p-5 rounded-3xl border shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${mensaje.tipo === 'exito'
+                  ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200'
                   : 'bg-rose-950/95 border-rose-800 text-rose-300'
-              }`}>
+                }`}>
                 <div className="flex items-center gap-3">
                   {mensaje.tipo === 'exito' ? (
                     <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-emerald-400" />
@@ -1331,7 +1322,7 @@ Acabo de reservar un turno por la web:
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-400" /> 1. Elegí el día de tu partido
               </label>
-               
+
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 sm:gap-2">
                 {proximosDias.map((d) => {
                   const isSelected = fecha === d.fechaISO;
@@ -1339,11 +1330,10 @@ Acabo de reservar un turno por la web:
                     <button
                       key={d.fechaISO}
                       onClick={() => setFecha(d.fechaISO)}
-                      className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer ${
-                        isSelected
-                            ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
+                      className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer ${isSelected
+                          ? 'border-emerald-400 bg-emerald-400 text-zinc-950 font-black shadow-lg shadow-emerald-500/25'
                           : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
-                      }`}
+                        }`}
                     >
                       <span className={`text-[9px] sm:text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-zinc-950' : 'text-zinc-400'}`}>
                         {d.etiqueta}
@@ -1370,11 +1360,10 @@ Acabo de reservar un turno por la web:
                     <button
                       key={c.id}
                       onClick={() => setCanchaSeleccionada(c.id)}
-                      className={`p-3.5 sm:p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${
-                        isSelected 
-                            ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg' 
-                            : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
-                      }`}
+                      className={`p-3.5 sm:p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${isSelected
+                          ? 'border-emerald-500/80 bg-emerald-500/10 text-emerald-300 font-bold shadow-lg'
+                          : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 text-zinc-300'
+                        }`}
                     >
                       <div>
                         <p className="text-white font-bold text-sm sm:text-base">{c.nombre}</p>
@@ -1387,42 +1376,43 @@ Acabo de reservar un turno por la web:
             </section>
 
             {/* Horarios */}
-          <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> 3. Horarios Disponibles (90 min)
-              </h2>
-              <span className="text-[11px] sm:text-xs text-zinc-400 font-medium">Turnos estándar</span>
-            </div>
-             
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-              {slots.map((slot, idx) => {
-                const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
-                return (
-                  <button
-                    key={idx}
-                    disabled={!slot.disponible}
-                    onClick={() => handleSeleccionarSlot(slot)}
-                    className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${
-                      !slot.disponible
+            <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> 3. Horarios Disponibles (90 min)
+                </h2>
+                <span className="text-[11px] sm:text-xs text-zinc-400 font-medium">Turnos estándar</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                {slots.map((slot, idx) => {
+                  const isSelected = slotSeleccionado?.horaInicio === slot.horaInicio;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={!slot.disponible || slot.cargando}
+                      onClick={() => handleSeleccionarSlot(slot)}
+                      className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${(!slot.disponible || slot.cargando)
                           ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
                           : isSelected
-                          ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
-                          : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
-                    }`}
-                  >
-                    <span className="text-xs sm:text-sm">{slot.horaInicio?.slice(0, 5)} hs</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+                            ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
+                            : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
+                        }`}
+                    >
+                      <span className="text-xs sm:text-sm">
+                        {slot.cargando ? "Cargando..." : `${slot.horaInicio?.slice(0, 5)} hs`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
 
             {/* Formulario de Confirmación */}
             {slotSeleccionado && (
-              <form 
+              <form
                 ref={formRef}
-                onSubmit={handlePreReservar} 
+                onSubmit={handlePreReservar}
                 className="bg-zinc-900/95 border border-emerald-500/40 rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl"
               >
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -1439,7 +1429,7 @@ Acabo de reservar un turno por la web:
                   <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Shield className="w-4 h-4" /> Datos de pago por transferencia
                   </p>
-                  
+
                   <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-zinc-500 block">ALIAS BANCARIO</span>
@@ -1497,7 +1487,7 @@ Acabo de reservar un turno por la web:
                   <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
                     Adjuntar Captura del Comprobante (Mercado Pago / Cuenta DNI) *
                   </label>
-                  
+
                   <div className="relative">
                     {!comprobanteArchivo ? (
                       <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-emerald-500/40 rounded-2xl bg-zinc-950/80 hover:bg-zinc-950 hover:border-emerald-400 transition cursor-pointer group">
