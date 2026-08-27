@@ -313,6 +313,8 @@ useEffect(() => {
       cargarSlots();
       const msg = 'Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.';
       setMensaje({ tipo: 'error', texto: msg });
+      
+      return; // 👈 Frena la ejecución y evita que avance al formulario
     }
   };
 
