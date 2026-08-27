@@ -304,7 +304,7 @@ export default function App() {
         nombreCliente: "Bloqueo Temporal",
         telefonoCliente: "PENDIENTE"
       });
-      
+
       setReservaTemporalId(res.data.id);
       setSlotSeleccionado(slot);
       cargarSlots();
@@ -314,7 +314,7 @@ export default function App() {
       cargarSlots();
       const msg = err.response?.data || 'Este horario está siendo seleccionado por otro usuario en este momento.';
       setMensaje({ tipo: 'error', texto: msg });
-      
+
       setSlotSeleccionado(null);
       setReservaTemporalId(null);
     }
@@ -823,6 +823,7 @@ Acabo de reservar un turno por la web:
                       type="date"
                       value={adminFecha}
                       onChange={(e) => setAdminFecha(e.target.value)}
+                      onClick={(e) => e.target.showPicker && e.target.showPicker()}
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer"
                     />
                   </div>
@@ -1387,10 +1388,10 @@ Acabo de reservar un turno por la web:
                       disabled={!slot.disponible}
                       onClick={() => handleSeleccionarSlot(slot)}
                       className={`p-3 sm:p-3.5 rounded-2xl border text-center font-bold transition ${!slot.disponible
-                          ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
-                          : isSelected
-                            ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
-                            : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
+                        ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 line-through cursor-not-allowed opacity-50'
+                        : isSelected
+                          ? 'bg-emerald-400 text-zinc-950 border-emerald-300 font-black shadow-lg shadow-emerald-500/25'
+                          : 'bg-zinc-950/70 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 text-zinc-200 cursor-pointer'
                         }`}
                     >
                       <span className="text-xs sm:text-sm">{slot.horaInicio?.slice(0, 5)} hs</span>
