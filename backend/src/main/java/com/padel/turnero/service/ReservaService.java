@@ -244,24 +244,24 @@ public class ReservaService {
         LocalTime ahora = LocalTime.now();
 
         if (dto.getHoraInicio() == null) {
-            // Si bloquea el día completo, solo tomamos los horarios que todavía no pasaron
+            // Si bloquea el día completo, solo tomamos los horarios cuya hora de inicio sea actual o futura
             for (LocalTime h : todosLosHorarios) {
-                if (!esHoy || !h.isBefore(ahora.minusMinutes(90))) { // Si el turno ya arrancó o es futuro
+                if (!esHoy || !h.isBefore(ahora)) {
                     horariosABloquear.add(h);
                 }
             }
         } else if (dto.isHastaElCierre()) {
             for (LocalTime h : todosLosHorarios) {
                 if (!h.isBefore(dto.getHoraInicio())) {
-                    if (!esHoy || !h.isBefore(ahora.minusMinutes(90))) {
+                    if (!esHoy || !h.isBefore(ahora)) {
                         horariosABloquear.add(h);
                     }
                 }
             }
         } else {
-            // Si el admin elige un horario específico, validamos que no sea un turno pasado del día de hoy
-            if (esHoy && dto.getHoraInicio().isBefore(ahora.minusMinutes(90))) {
-                throw new RuntimeException("No se puede bloquear un horario que ya pasó.");
+            // Si el admin elige un horario específico, validamos que su inicio no haya pasado
+            if (esHoy && dto.getHoraInicio().isBefore(ahora)) {
+                throw new RuntimeException("No se puede bloquear un horario que ya comenzó o pasó.");
             }
             horariosABloquear.add(dto.getHoraInicio());
         }
@@ -293,8 +293,6 @@ public class ReservaService {
 
                 if (reservaExistenteOpt.isPresent()) {
                     Reserva r = reservaExistenteOpt.get();
-                    // Ojo acá: si ya estaba CONFIRMADO o FIJO por un cliente, idealmente no pisarlo con un bloqueo de admin a menos que se quiera,
-                    // pero mantenemos tu lógica original de estados permitidos:
                     if (r.getEstado() == EstadoReserva.CANCELADO || r.getEstado() == EstadoReserva.BLOQUEADO || r.getEstado() == EstadoReserva.PENDIENTE_TEMPORAL) {
                         r.setEstado(EstadoReserva.BLOQUEADO);
                         r.setNombreCliente("⛔ " + motivo);
