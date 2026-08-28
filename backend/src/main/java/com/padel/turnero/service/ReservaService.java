@@ -272,24 +272,56 @@ public class ReservaService {
                 ? dto.getMotivo() : "Mantenimiento / Bloqueado";
 
         java.time.DayOfWeek diaSemana = dto.getFecha().getDayOfWeek();
-        List<LocalTime> todosLosHorarios;
+        List<LocalTime> todosLosHorarios = new ArrayList<>();
 
-        if (diaSemana == java.time.DayOfWeek.SUNDAY) {
-            todosLosHorarios = List.of(
-                    LocalTime.of(15, 0), LocalTime.of(16, 30),
-                    LocalTime.of(18, 0), LocalTime.of(19, 30)
-            );
-        } else if (diaSemana == java.time.DayOfWeek.SATURDAY) {
-            todosLosHorarios = List.of(
-                    LocalTime.of(13, 30), LocalTime.of(15, 0), LocalTime.of(16, 30),
-                    LocalTime.of(18, 0), LocalTime.of(19, 30), LocalTime.of(21, 0)
-            );
+        // Si el DTO trae los horarios especiales del día, los usamos de forma dinámica
+        if (dto.getApertura() != null && !dto.getApertura().isEmpty() && dto.getCierre() != null && !dto.getCierre().isEmpty()) {
+            LocalTime aperturaCustom = LocalTime.parse(dto.getApertura().length() == 5 ? dto.getApertura() + ":00" : dto.getApertura());
+            LocalTime cierreCustom = LocalTime.parse(dto.getCierre().length() == 5 ? dto.getCierre() + ":00" : dto.getCierre());
+
+            if (cierreCustom.equals(LocalTime.of(0, 0))) {
+                cierreCustom = LocalTime.of(23, 59);
+            }
+
+            LocalTime cursor = aperturaCustom;
+            int seguridad = 0;
+            while (cursor.plusMinutes(90).compareTo(cierreCustom) <= 0 && seguridad < 20) {
+                todosLosHorarios.add(cursor);
+                LocalTime siguiente = cursor.plusMinutes(90);
+                if (siguiente.equals(cierreCustom) || siguiente.isBefore(cursor) || siguiente.compareTo(cierreCustom) > 0) {
+                    break;
+                }
+                cursor = siguiente;
+                seguridad++;
+            }
         } else {
-            todosLosHorarios = List.of(
-                    LocalTime.of(13, 30), LocalTime.of(15, 0), LocalTime.of(16, 30),
-                    LocalTime.of(18, 0), LocalTime.of(19, 30), LocalTime.of(21, 0),
-                    LocalTime.of(22, 30)
-            );
+            LocalTime aperturaCustom;
+            LocalTime cierreCustom;
+
+            if (diaSemana == java.time.DayOfWeek.SUNDAY) {
+                aperturaCustom = LocalTime.of(15, 0);
+                cierreCustom = LocalTime.of(21, 0);
+            } else if (diaSemana == java.time.DayOfWeek.SATURDAY) {
+                aperturaCustom = LocalTime.of(13, 30);
+                cierreCustom = LocalTime.of(22, 30);
+            } else {
+                aperturaCustom = LocalTime.of(13, 30);
+                cierreCustom = LocalTime.of(0, 0);
+            }
+
+            LocalTime cursor = aperturaCustom;
+            LocalTime limiteCierre = cierreCustom.equals(LocalTime.of(0, 0)) ? LocalTime.of(23, 59) : cierreCustom;
+            int seguridad = 0;
+
+            while (cursor.plusMinutes(90).compareTo(limiteCierre) <= 0 && seguridad < 20) {
+                todosLosHorarios.add(cursor);
+                LocalTime siguiente = cursor.plusMinutes(90);
+                if (siguiente.equals(limiteCierre) || siguiente.isBefore(cursor) || siguiente.compareTo(limiteCierre) > 0) {
+                    break;
+                }
+                cursor = siguiente;
+                seguridad++;
+            }
         }
 
         List<LocalTime> horariosABloquear = new ArrayList<>();
@@ -335,7 +367,6 @@ public class ReservaService {
             for (LocalTime hora : horariosABloquear) {
                 LocalTime horaFin = hora.plusMinutes(90);
 
-                // Blindaje anti-error: si por alguna razón la hora de fin queda antes que la de inicio, las corregimos
                 if (horaFin.isBefore(hora)) {
                     horaFin = hora.plusMinutes(90);
                 }
@@ -370,6 +401,7 @@ public class ReservaService {
             }
         }
     }
+
     @Autowired
     private FileStorageService fileStorageService;
 
@@ -411,7 +443,6 @@ public class ReservaService {
         Cancha cancha = canchaRepository.findById(dto.getCanchaId())
                 .orElseThrow(() -> new RuntimeException("Cancha no encontrada"));
 
-        // 1. Validar que no sea un horario pasado
         if (dto.getFecha().equals(LocalDate.now()) && dto.getHoraInicio().isBefore(LocalTime.now())) {
             throw new RuntimeException("No se pueden seleccionar horarios pasados.");
         }
@@ -420,7 +451,6 @@ public class ReservaService {
                 ? LocalTime.of(23, 59, 59)
                 : dto.getHoraInicio().plusMinutes(90);
 
-        // 2. Verificación estricta de solapamiento en base de datos (Incluye temporales vigentes, confirmados, etc.)
         boolean solapa = reservaRepository.existeSolapamiento(
                 cancha.getId(), dto.getFecha(), dto.getHoraInicio(), horaFin, EstadoReserva.CANCELADO
         );
@@ -429,18 +459,15 @@ public class ReservaService {
             throw new RuntimeException("Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.");
         }
 
-        // 3. Buscamos si ya existe un registro previo exacto para esa cancha/fecha/hora (ej: uno viejo expirado)
         Optional<Reserva> existenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
                 cancha.getId(), dto.getFecha(), dto.getHoraInicio()
         );
 
         if (existenteOpt.isPresent()) {
             Reserva r = existenteOpt.get();
-            // Doble chequeo de seguridad por si el estado es firme
             if (r.getEstado() == EstadoReserva.CONFIRMADO || r.getEstado() == EstadoReserva.BLOQUEADO || r.getEstado() == EstadoReserva.FIJO) {
                 throw new RuntimeException("Este horario está siendo seleccionado por otro usuario en este momento. Si no concreta la reserva, volverá a estar disponible.");
             }
-            // Si estaba cancelado o expirado, lo reciclamos como temporal nuevo por 3 minutos
             r.setNombreCliente(dto.getNombreCliente() != null ? dto.getNombreCliente() : "Bloqueo Temporal");
             r.setTelefonoCliente(dto.getTelefonoCliente() != null ? dto.getTelefonoCliente() : "PENDIENTE");
             r.setEstado(EstadoReserva.PENDIENTE_TEMPORAL);
@@ -449,7 +476,6 @@ public class ReservaService {
             return reservaRepository.save(r);
         }
 
-        // 4. Si está totalmente libre, creamos un nuevo registro temporal por 3 minutos
         Reserva reserva = Reserva.builder()
                 .cancha(cancha)
                 .fecha(dto.getFecha())

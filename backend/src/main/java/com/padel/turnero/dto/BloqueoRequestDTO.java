@@ -8,8 +8,10 @@ public class BloqueoRequestDTO {
     private Long clubId;
     private LocalDate fecha;
     private LocalTime horaInicio;
-    private boolean hastaElCierre; // 👈 NUEVO CAMPO
+    private boolean hastaElCierre;
     private String motivo;
+    private String apertura; // 👈 NUEVO
+    private String cierre;   // 👈 NUEVO
 
     public Long getCanchaId() { return canchaId; }
     public void setCanchaId(Long canchaId) { this.canchaId = canchaId; }
@@ -28,4 +30,10 @@ public class BloqueoRequestDTO {
 
     public String getMotivo() { return motivo; }
     public void setMotivo(String motivo) { this.motivo = motivo; }
+
+    public String getApertura() { return apertura; }
+    public void setApertura(String apertura) { this.apertura = apertura; }
+
+    public String getCierre() { return cierre; }
+    public void setCierre(String cierre) { this.cierre = cierre; }
 }
