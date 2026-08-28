@@ -29,15 +29,16 @@ import {
 
 import FONDO from './assets/FONDO.jpg.avif';
 
-// Si Vercel tiene la URL con /api/v1 o sin ella, nos aseguramos de que quede prolijo
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 const API_BASE = rawApiUrl.endsWith('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`;
 const CLUB_SLUG = 'padel-central';
 
 const obtenerFechaLocalISO = (fechaObj = new Date()) => {
-  const anio = fechaObj.getFullYear();
-  const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
-  const dia = String(fechaObj.getDate()).padStart(2, '0');
+  const opciones = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
+  const partes = new Intl.DateTimeFormat('es-AR', opciones).formatToParts(fechaObj);
+  const anio = partes.find(p => p.type === 'year').value;
+  const mes = partes.find(p => p.type === 'month').value;
+  const dia = partes.find(p => p.type === 'day').value;
   return `${anio}-${mes}-${dia}`;
 };
 
@@ -126,6 +127,88 @@ function PadelLoader({ texto = "Cargando complejo..." }) {
   );
 }
 
+function CalendarioPicker({ fechaSeleccionada, hoyISO, onSeleccionar, onCerrar }) {
+  const [anioMes, setAnioMes] = useState(() => {
+    const [a, m] = fechaSeleccionada.split('-').map(Number);
+    return { anio: a, mes: m - 1 };
+  });
+
+  const nombresDias = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+  const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+  const primerDiaMes = new Date(anioMes.anio, anioMes.mes, 1);
+  const diasEnMes = new Date(anioMes.anio, anioMes.mes + 1, 0).getDate();
+
+  let offset = primerDiaMes.getDay() - 1;
+  if (offset < 0) offset = 6;
+
+  const celdas = [];
+  for (let i = 0; i < offset; i++) celdas.push(null);
+  for (let dia = 1; dia <= diasEnMes; dia++) celdas.push(dia);
+
+  const formatearISO = (dia) => {
+    const mm = String(anioMes.mes + 1).padStart(2, '0');
+    const dd = String(dia).padStart(2, '0');
+    return `${anioMes.anio}-${mm}-${dd}`;
+  };
+
+  const irMesAnterior = () => {
+    setAnioMes(prev => {
+      const mes = prev.mes - 1;
+      return mes < 0 ? { anio: prev.anio - 1, mes: 11 } : { anio: prev.anio, mes };
+    });
+  };
+
+  const irMesSiguiente = () => {
+    setAnioMes(prev => {
+      const mes = prev.mes + 1;
+      return mes > 11 ? { anio: prev.anio + 1, mes: 0 } : { anio: prev.anio, mes };
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]" onClick={onCerrar}>
+      <div
+        className="bg-white text-zinc-900 rounded-2xl shadow-2xl p-4 w-72"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <button type="button" onClick={irMesAnterior} className="p-1.5 rounded-lg hover:bg-zinc-100 cursor-pointer">◀</button>
+          <span className="font-bold text-sm">{nombresMeses[anioMes.mes]} {anioMes.anio}</span>
+          <button type="button" onClick={irMesSiguiente} className="p-1.5 rounded-lg hover:bg-zinc-100 cursor-pointer">▶</button>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {nombresDias.map((d, i) => (
+            <div key={i} className="text-center text-[10px] font-bold text-zinc-400 uppercase">{d}</div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {celdas.map((dia, idx) => {
+            if (dia === null) return <div key={idx} />;
+            const iso = formatearISO(dia);
+            const esHoy = iso === hoyISO;
+            const esSeleccionado = iso === fechaSeleccionada;
+
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => { onSeleccionar(iso); onCerrar(); }}
+                className={`h-8 w-8 rounded-lg text-xs font-semibold transition cursor-pointer
+                  ${esSeleccionado ? 'bg-emerald-500 text-white' : esHoy ? 'bg-emerald-100 text-emerald-700 font-black' : 'hover:bg-zinc-100 text-zinc-700'}`}
+              >
+                {dia}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [vistaAdmin, setVistaAdmin] = useState(false);
   const [estaAutenticado, setEstaAutenticado] = useState(false);
@@ -137,8 +220,10 @@ export default function App() {
   const [canchas, setCanchas] = useState([]);
   const [canchaSeleccionada, setCanchaSeleccionada] = useState(null);
 
-  const hoyISO = obtenerFechaLocalISO(new Date());
+  const hoyISO = obtenerFechaLocalISO();
   const [fecha, setFecha] = useState(hoyISO);
+  const [mostrarCalendario, setMostrarCalendario] = useState(false);
+  const [mostrarCalendarioBloqueo, setMostrarCalendarioBloqueo] = useState(false);
 
   const [slots, setSlots] = useState([]);
   const [slotSeleccionado, setSlotSeleccionado] = useState(null);
@@ -152,21 +237,27 @@ export default function App() {
   const [mostrarModalCrearAdmin, setMostrarModalCrearAdmin] = useState(false);
   const [adminCanchaId, setAdminCanchaId] = useState('');
   const [adminFecha, setAdminFecha] = useState(hoyISO);
-  const [adminHoraInicio, setAdminHoraInicio] = useState('18:00:00');
+  const [adminHoraInicio, setAdminHoraInicio] = useState('');
   const [adminNombre, setAdminNombre] = useState('');
   const [adminTelefono, setAdminTelefono] = useState('');
   const [adminEsFijo, setAdminEsFijo] = useState(false);
   const [adminError, setAdminError] = useState('');
   const [adminCanchaFijada, setAdminCanchaFijada] = useState(false);
+  const [adminSlots, setAdminSlots] = useState([]);
 
   const [mostrarModalBloqueo, setMostrarModalBloqueo] = useState(false);
   const [bloqueoCanchaId, setBloqueoCanchaId] = useState('0');
   const [tipoBloqueoHorario, setTipoBloqueoHorario] = useState('DIA_COMPLETO');
-  const [bloqueoHoraInicio, setBloqueoHoraInicio] = useState('18:00');
+  const [bloqueoHoraInicio, setBloqueoHoraInicio] = useState('');
   const [bloqueoMotivo, setBloqueoMotivo] = useState('Torneo');
   const [bloqueoFecha, setBloqueoFecha] = useState(hoyISO);
   const [bloqueoError, setBloqueoError] = useState('');
   const [bloqueando, setBloqueando] = useState(false);
+  const [bloqueoSlots, setBloqueoSlots] = useState([]);
+
+  const [tipoGestion, setTipoGestion] = useState('horario');
+  const [nuevaApertura, setNuevaApertura] = useState('13:30');
+  const [nuevoCierre, setNuevoCierre] = useState('21:00');
 
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -176,7 +267,12 @@ export default function App() {
   const [errorCarga, setErrorCarga] = useState(null);
 
   const [mostrarModalConfirmacionWA, setMostrarModalConfirmacionWA] = useState(false);
+  const [horariosEspeciales, setHorariosEspeciales] = useState({});
   const formRef = useRef(null);
+  const horariosEspecialesRef = useRef(horariosEspeciales);
+  useEffect(() => {
+    horariosEspecialesRef.current = horariosEspeciales;
+  }, [horariosEspeciales]);
 
   useEffect(() => {
     if (slotSeleccionado && formRef.current) {
@@ -199,18 +295,25 @@ export default function App() {
     const lista = [];
     const nombresDias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    const hoy = new Date();
+
+    const partesHoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const anio = Number(partesHoy.find(p => p.type === 'year').value);
+    const mes = Number(partesHoy.find(p => p.type === 'month').value) - 1;
+    const dia = Number(partesHoy.find(p => p.type === 'day').value);
+
+    const baseHoy = new Date(anio, mes, dia);
 
     for (let i = 0; i < 8; i++) {
-      const d = new Date();
-      d.setDate(hoy.getDate() + i);
+      const d = new Date(baseHoy);
+      d.setDate(baseHoy.getDate() + i);
+
       const fechaISO = obtenerFechaLocalISO(d);
       const diaSemana = nombresDias[d.getDay()];
       const diaNumero = d.getDate();
-      const mes = meses[d.getMonth()];
+      const mesNombre = meses[d.getMonth()];
       const etiqueta = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : `${diaSemana} ${diaNumero}`;
 
-      lista.push({ fechaISO, etiqueta, diaNumero, diaSemana, mes });
+      lista.push({ fechaISO, etiqueta, diaNumero, diaSemana, mes: mesNombre });
     }
     return lista;
   }, []);
@@ -248,13 +351,58 @@ export default function App() {
 
   const cargarSlots = useCallback(() => {
     if (!canchaSeleccionada || !fecha) return;
-    axios.get(`${API_BASE}/reservas/disponibilidad?canchaId=${canchaSeleccionada}&fecha=${fecha}`)
+
+    const horarioDia = horariosEspecialesRef.current[fecha];
+    let url = `${API_BASE}/reservas/disponibilidad?canchaId=${canchaSeleccionada}&fecha=${fecha}`;
+
+    if (horarioDia) {
+      url += `&apertura=${horarioDia.apertura}&cierre=${horarioDia.cierre}`;
+    }
+
+    axios.get(url)
       .then(res => {
         const nuevosSlots = Array.isArray(res.data) ? res.data : [];
         setSlots(nuevosSlots);
       })
       .catch(() => setSlots([]));
   }, [canchaSeleccionada, fecha]);
+
+  useEffect(() => {
+    if (mostrarModalCrearAdmin && adminCanchaId && adminFecha) {
+      const horarioDia = horariosEspeciales[adminFecha];
+      let url = `${API_BASE}/reservas/disponibilidad?canchaId=${adminCanchaId}&fecha=${adminFecha}`;
+      
+      if (horarioDia) {
+        url += `&apertura=${horarioDia.apertura}&cierre=${horarioDia.cierre}`;
+      }
+
+      axios.get(url)
+        .then(res => {
+          const data = Array.isArray(res.data) ? res.data : [];
+          setAdminSlots(data);
+          const libres = data.filter(s => s.disponible);
+          if (libres.length > 0 && (!adminHoraInicio || !libres.some(s => s.horaInicio === adminHoraInicio))) {
+            setAdminHoraInicio(libres[0].horaInicio);
+          }
+        })
+        .catch(() => setAdminSlots([]));
+    }
+  }, [mostrarModalCrearAdmin, adminCanchaId, adminFecha, horariosEspeciales]);
+
+  useEffect(() => {
+    if (mostrarModalBloqueo && bloqueoFecha) {
+      const canchaIdParaConsultar = (bloqueoCanchaId && bloqueoCanchaId !== '0') ? bloqueoCanchaId : (canchas[0]?.id || 1);
+      axios.get(`${API_BASE}/reservas/disponibilidad?canchaId=${canchaIdParaConsultar}&fecha=${bloqueoFecha}`)
+        .then(res => {
+          const data = Array.isArray(res.data) ? res.data : [];
+          setBloqueoSlots(data);
+          if (data.length > 0 && (!bloqueoHoraInicio || !data.some(s => s.horaInicio === bloqueoHoraInicio))) {
+            setBloqueoHoraInicio(data[0].horaInicio);
+          }
+        })
+        .catch(() => setBloqueoSlots([]));
+    }
+  }, [mostrarModalBloqueo, bloqueoFecha, bloqueoCanchaId, canchas]);
 
   const cargarReservasAdmin = useCallback(() => {
     if (!club?.id || !fecha) return;
@@ -269,7 +417,7 @@ export default function App() {
   useEffect(() => {
     if (!vistaAdmin && canchaSeleccionada && fecha) {
       cargarSlots();
-      const intervalId = setInterval(cargarSlots, 1000); // Actualiza cada 1 segundos
+      const intervalId = setInterval(cargarSlots, 1000);
       return () => clearInterval(intervalId);
     }
   }, [vistaAdmin, canchaSeleccionada, fecha, cargarSlots]);
@@ -282,7 +430,6 @@ export default function App() {
     }
   }, [vistaAdmin, estaAutenticado, fecha, club?.id, cargarReservasAdmin]);
 
-  // Bloqueo temporal de 3 minutos al hacer clic en un slot libre y despliegue del formulario
   const handleSeleccionarSlot = async (slot) => {
     if (!slot.disponible) return;
 
@@ -362,7 +509,7 @@ export default function App() {
   };
 
   const handleConfirmarYEnviarWA = async () => {
-    if (cargando) return; // Frena cualquier doble clic por seguridad
+    if (cargando) return;
     setCargando(true);
 
     const canchaObj = canchas.find(c => c.id === canchaSeleccionada);
@@ -554,6 +701,10 @@ Acabo de reservar un turno por la web:
     });
   }, [canchas, reservasAdmin, ocultarCancelados]);
 
+  const adminHorariosDisponibles = useMemo(() => {
+    return adminSlots.filter(slot => slot.disponible);
+  }, [adminSlots]);
+
   const canchaActualObj = canchas.find(c => c.id === canchaSeleccionada);
 
   if (errorCarga) {
@@ -575,7 +726,6 @@ Acabo de reservar un turno por la web:
   return (
     <div className="relative min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500 selection:text-zinc-950 overflow-x-hidden">
 
-      {/* FONDO */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-zinc-950">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-100"
@@ -586,7 +736,6 @@ Acabo de reservar un turno por la web:
 
       <div className="relative z-10 p-3 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
 
-        {/* Barra superior */}
         <header className="flex items-start justify-between bg-zinc-900/95 border border-zinc-800 p-4 sm:p-5 rounded-3xl shadow-xl gap-3">
           <div className="flex items-start gap-3 min-w-0 flex-1">
             <div className="p-2.5 sm:p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-emerald-400 flex-shrink-0 mt-0.5">
@@ -634,7 +783,6 @@ Acabo de reservar un turno por la web:
           </div>
         </header>
 
-        {/* Modal de Imagen / Comprobante (Admin) */}
         {imagenModalUrl && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-zinc-700 p-4 rounded-3xl max-w-lg w-full space-y-4 shadow-2xl text-center">
@@ -668,7 +816,6 @@ Acabo de reservar un turno por la web:
           </div>
         )}
 
-        {/* Modal Login Admin */}
         {mostrarModalLogin && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl">
@@ -713,7 +860,6 @@ Acabo de reservar un turno por la web:
           </div>
         )}
 
-        {/* Modal Obligatorio WhatsApp */}
         {mostrarModalConfirmacionWA && slotSeleccionado && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-emerald-500/40 p-6 rounded-3xl max-w-md w-full space-y-5 shadow-2xl text-center">
@@ -828,15 +974,21 @@ Acabo de reservar un turno por la web:
                     />
                   </div>
                   <div className="w-full min-w-0">
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Hora Inicio</label>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Hora Inicio (Disponibles)</label>
                     <select
                       value={adminHoraInicio}
                       onChange={(e) => setAdminHoraInicio(e.target.value)}
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-emerald-500 appearance-none"
                     >
-                      {["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00", "21:30", "23:00"].map((h) => (
-                        <option key={h} value={`${h}:00`}>{h} hs</option>
-                      ))}
+                      {adminHorariosDisponibles.length === 0 ? (
+                        <option value="">No hay horarios libres</option>
+                      ) : (
+                        adminHorariosDisponibles.map((slot) => (
+                          <option key={slot.horaInicio} value={slot.horaInicio}>
+                            {slot.horaInicio?.slice(0, 5)} hs
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                 </div>
@@ -896,7 +1048,8 @@ Acabo de reservar un turno por la web:
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold py-3 rounded-2xl text-xs shadow-lg shadow-emerald-500/20 transition cursor-pointer"
+                    disabled={adminHorariosDisponibles.length === 0}
+                    className="flex-1 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold py-3 rounded-2xl text-xs shadow-lg shadow-emerald-500/20 transition cursor-pointer disabled:opacity-50"
                   >
                     {adminEsFijo ? 'Crear Turno Fijo' : 'Registrar Turno'}
                   </button>
@@ -906,14 +1059,14 @@ Acabo de reservar un turno por la web:
           </div>
         )}
 
-        {/* Modal Bloqueo */}
+        {/* Modal Gestionar Complejo / Bloqueos */}
         {mostrarModalBloqueo && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
             <div className="bg-zinc-900 border border-zinc-800 p-5 sm:p-6 rounded-3xl max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-rose-400 font-bold text-base sm:text-lg">
-                  <Ban className="w-5 h-5" />
-                  {bloqueoCanchaId === '0' ? 'Bloquear Complejo (Todas)' : 'Bloquear Cancha'}
+                <div className={`flex items-center gap-2 font-bold text-base sm:text-lg ${bloqueoCanchaId === '0' ? 'text-white' : 'text-rose-400'}`}>
+                  <Shield className={`w-5 h-5 ${bloqueoCanchaId === '0' ? 'text-emerald-400' : 'text-rose-400'}`} />
+                  {bloqueoCanchaId === '0' ? 'Gestionar Complejo' : 'Bloquear Cancha'}
                 </div>
                 <button
                   onClick={() => setMostrarModalBloqueo(false)}
@@ -923,131 +1076,262 @@ Acabo de reservar un turno por la web:
                 </button>
               </div>
 
-              {bloqueoError && (
-                <div className="p-3 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-2.5">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{bloqueoError}</span>
+              {bloqueoCanchaId === '0' && (
+                <div className="grid grid-cols-2 gap-2 bg-zinc-800/60 p-1 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setTipoGestion('horario')}
+                    className={`py-2 text-xs font-bold rounded-xl transition ${tipoGestion === 'horario' ? 'bg-emerald-500 text-black shadow-lg' : 'text-zinc-400 hover:text-white'}`}
+                  >
+                    🕒 Horario del Día
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoGestion('bloqueo')}
+                    className={`py-2 text-xs font-bold rounded-xl transition ${tipoGestion === 'bloqueo' ? 'bg-rose-500 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}
+                  >
+                    ⛔ Bloqueo Completo
+                  </button>
                 </div>
               )}
 
-              <form onSubmit={handleBloquearTurnos} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Alcance del Bloqueo</label>
-                  {bloqueoCanchaId === '0' ? (
-                    <div className="w-full bg-zinc-950 border border-rose-500/30 rounded-2xl p-3 text-rose-400 font-black text-xs flex items-center gap-2">
-                      <Ban className="w-4 h-4" /> 🚨 Todas las canchas (Bloqueo Complejo Entero)
-                    </div>
-                  ) : (
-                    <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-rose-400 font-bold text-sm">
-                      {canchas.find(c => String(c.id) === String(bloqueoCanchaId))?.nombre || 'Cancha'} (Pista individual)
-                    </div>
-                  )}
-                </div>
+              {bloqueoCanchaId === '0' && tipoGestion === 'horario' ? (
+                <div className="space-y-4">
+                  <p className="text-xs text-zinc-400">
+                    Definí la franja horaria en la que abrirá el complejo en la fecha seleccionada. Los turnos fuera de este rango se inhabilitarán automáticamente.
+                  </p>
 
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Fecha a bloquear</label>
-                  <input
-                    type="date"
-                    value={bloqueoFecha}
-                    onChange={(e) => setBloqueoFecha(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-rose-500 appearance-none"
-                  />
-                </div>
-
-                <div className="bg-zinc-950/80 border border-zinc-800 p-3.5 rounded-2xl space-y-3">
-                  <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-                    Rango de Horarios:
-                  </label>
-
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="relative">
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Fecha a configurar</label>
                     <button
                       type="button"
-                      onClick={() => setTipoBloqueoHorario('DIA_COMPLETO')}
-                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DIA_COMPLETO'
-                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                        }`}
+                      onClick={() => setMostrarCalendarioBloqueo(!mostrarCalendarioBloqueo)}
+                      className="w-full text-left bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none transition cursor-pointer"
                     >
-                      Día Completo
+                      {formatearFechaConDia(bloqueoFecha)}
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setTipoBloqueoHorario('DESDE_HORA')}
-                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DESDE_HORA'
-                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                        }`}
-                    >
-                      Desde hora
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setTipoBloqueoHorario('SOLO_TURNO')}
-                      className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'SOLO_TURNO'
-                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                        }`}
-                    >
-                      Solo 1 Turno
-                    </button>
+                    {mostrarCalendarioBloqueo && (
+                      <CalendarioPicker
+                        fechaSeleccionada={bloqueoFecha}
+                        hoyISO={hoyISO}
+                        onSeleccionar={setBloqueoFecha}
+                        onCerrar={() => setMostrarCalendarioBloqueo(false)}
+                      />
+                    )}
                   </div>
 
-                  {tipoBloqueoHorario !== 'DIA_COMPLETO' && (
-                    <div className="pt-2 border-t border-zinc-800 space-y-1.5">
-                      <label className="block text-[11px] text-zinc-400 font-medium">
-                        {tipoBloqueoHorario === 'DESDE_HORA' ? 'A partir de qué horario inhabilitar:' : 'Horario puntual a inhabilitar:'}
-                      </label>
-                      <select
-                        value={bloqueoHoraInicio}
-                        onChange={(e) => setBloqueoHoraInicio(e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-100 text-base sm:text-xs focus:outline-none focus:border-rose-500 appearance-none"
-                      >
-                        {["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00", "21:30", "23:00"].map((h) => (
-                          <option key={h} value={h}>{h} hs</option>
-                        ))}
-                      </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 mb-1">Abre a partir de (Ej: 13:30):</label>
+                      <input
+                        type="text"
+                        placeholder="13:30"
+                        maxLength={5}
+                        value={nuevaApertura}
+                        onChange={(e) => setNuevaApertura(e.target.value.replace(/[^0-9:]/g, ''))}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 mb-1">Cierra a las (Ej: 21:00):</label>
+                      <input
+                        type="text"
+                        placeholder="21:00"
+                        maxLength={5}
+                        value={nuevoCierre}
+                        onChange={(e) => setNuevoCierre(e.target.value.replace(/[^0-9:]/g, ''))}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!nuevaApertura || !nuevoCierre) {
+                        setBloqueoError('Completá la hora de apertura y cierre.');
+                        return;
+                      }
+
+                      // Convertimos las horas a minutos asegurando que 00:00 sea el cierre del día (24:00)
+                      const convertirAMinutos = (horaStr, esCierre = false) => {
+                        if (!horaStr) return 0;
+                        const [h, m] = horaStr.split(':').map(Number);
+                        if (esCierre && h === 0 && m === 0) return 24 * 60; // 00:00 de cierre vale como fin de día
+                        return h * 60 + m;
+                      };
+
+                      const minApertura = convertirAMinutos(nuevaApertura, false);
+                      const minCierre = convertirAMinutos(nuevoCierre, true);
+
+                      if (minApertura >= minCierre) {
+                        setBloqueoError('La hora de apertura debe ser menor a la de cierre.');
+                        return;
+                      }
+
+                      setHorariosEspeciales(prev => ({
+                        ...prev,
+                        [bloqueoFecha]: { apertura: nuevaApertura, cierre: nuevoCierre }
+                      }));
+
+                      setBloqueoError('');
+                      setMostrarModalBloqueo(false);
+                      setMensaje({
+                        tipo: 'exito',
+                        texto: `¡Horario del ${bloqueoFecha} actualizado: abre a las ${nuevaApertura} y cierra a las ${nuevoCierre} hs!`
+                      });
+
+                      if (fecha === bloqueoFecha) {
+                        cargarSlots();
+                      }
+                    }}
+                    className="w-full mt-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold py-3 rounded-2xl transition cursor-pointer text-xs shadow-lg shadow-emerald-500/20"
+                  >
+                    Guardar Horario del Día
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleBloquearTurnos} className="space-y-3.5">
+                  {bloqueoError && (
+                    <div className="p-3 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>{bloqueoError}</span>
                     </div>
                   )}
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Motivo del Bloqueo</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej: Torneo Anual / Lluvia / Luces"
-                    value={bloqueoMotivo}
-                    onChange={(e) => setBloqueoMotivo(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-rose-500"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Alcance del Bloqueo</label>
+                    {bloqueoCanchaId === '0' ? (
+                      <div className="w-full bg-zinc-950 border border-rose-500/30 rounded-2xl p-3 text-rose-400 font-black text-xs flex items-center gap-2">
+                        <Ban className="w-4 h-4" /> 🚨 Todas las canchas (Bloqueo Complejo Entero)
+                      </div>
+                    ) : (
+                      <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-rose-400 font-bold text-sm">
+                        {canchas.find(c => String(c.id) === String(bloqueoCanchaId))?.nombre || 'Cancha'} (Pista individual)
+                      </div>
+                    )}
+                  </div>
 
-                <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-start gap-2.5">
-                  <Info className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <p className="leading-snug">
-                    Se bloquearán los turnos libres. Los turnos ya reservados por clientes permanecerán intactos para que puedas avisarles antes de liberarlos.
-                  </p>
-                </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Fecha a bloquear</label>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarCalendarioBloqueo(!mostrarCalendarioBloqueo)}
+                      className="w-full text-left bg-zinc-950 border border-zinc-800 hover:border-rose-500/50 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none transition cursor-pointer"
+                    >
+                      {formatearFechaConDia(bloqueoFecha)}
+                    </button>
 
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setMostrarModalBloqueo(false)}
-                    className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-3 rounded-2xl text-xs transition cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={bloqueando}
-                    className="flex-1 bg-rose-500 hover:bg-rose-400 text-white font-bold py-3 rounded-2xl text-xs shadow-lg shadow-rose-500/20 transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {bloqueando ? 'Bloqueando...' : 'Confirmar Bloqueo'}
-                  </button>
-                </div>
-              </form>
+                    {mostrarCalendarioBloqueo && (
+                      <CalendarioPicker
+                        fechaSeleccionada={bloqueoFecha}
+                        hoyISO={hoyISO}
+                        onSeleccionar={setBloqueoFecha}
+                        onCerrar={() => setMostrarCalendarioBloqueo(false)}
+                      />
+                    )}
+                  </div>
+
+                  <div className="bg-zinc-950/80 border border-zinc-800 p-3.5 rounded-2xl space-y-3">
+                    <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                      Rango de Horarios:
+                    </label>
+
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTipoBloqueoHorario('DIA_COMPLETO')}
+                        className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DIA_COMPLETO'
+                          ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                          }`}
+                      >
+                        Día Completo
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTipoBloqueoHorario('DESDE_HORA')}
+                        className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'DESDE_HORA'
+                          ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                          }`}
+                      >
+                        Desde hora
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTipoBloqueoHorario('SOLO_TURNO')}
+                        className={`p-2 rounded-xl border text-[10px] sm:text-[11px] font-bold text-center transition cursor-pointer ${tipoBloqueoHorario === 'SOLO_TURNO'
+                          ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                          }`}
+                      >
+                        Solo 1 Turno
+                      </button>
+                    </div>
+
+                    {tipoBloqueoHorario !== 'DIA_COMPLETO' && (
+                      <div className="pt-2 border-t border-zinc-800 space-y-1.5">
+                        <label className="block text-[11px] text-zinc-400 font-medium">
+                          {tipoBloqueoHorario === 'DESDE_HORA' ? 'A partir de qué horario inhabilitar:' : 'Horario puntual a inhabilitar:'}
+                        </label>
+                        <select
+                          value={bloqueoHoraInicio}
+                          onChange={(e) => setBloqueoHoraInicio(e.target.value)}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-100 text-base sm:text-xs focus:outline-none focus:border-rose-500 appearance-none"
+                        >
+                          {bloqueoSlots.length === 0 ? (
+                            <option value="">No hay horarios disponibles</option>
+                          ) : (
+                            bloqueoSlots.map((slot) => (
+                              <option key={slot.horaInicio} value={slot.horaInicio}>
+                                {slot.horaInicio?.slice(0, 5)} hs
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Motivo del Bloqueo</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej: Torneo Anual / Lluvia / Luces"
+                      value={bloqueoMotivo}
+                      onChange={(e) => setBloqueoMotivo(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-zinc-100 text-base sm:text-sm focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-start gap-2.5">
+                    <Info className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <p className="leading-snug">
+                      Se bloquearán los turnos libres. Los turnos ya reservados por clientes permanecerán intactos para que puedas avisarles antes de liberarlos.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setMostrarModalBloqueo(false)}
+                      className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-3 rounded-2xl text-xs transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bloqueando}
+                      className="flex-1 bg-rose-500 hover:bg-rose-400 text-white font-bold py-3 rounded-2xl text-xs shadow-lg shadow-rose-500/20 transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {bloqueando ? 'Bloqueando...' : 'Confirmar Bloqueo'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}
@@ -1067,7 +1351,6 @@ Acabo de reservar un turno por la web:
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* BOTÓN PARA LIMPIAR DEMO EN LA NUBE */}
                   <button
                     onClick={async () => {
                       if (confirm('¿Querés borrar todas las reservas de la base de datos de producción?')) {
@@ -1090,11 +1373,12 @@ Acabo de reservar un turno por la web:
                       setBloqueoError('');
                       setBloqueoFecha(fecha);
                       setBloqueoCanchaId('0');
+                      setTipoGestion('horario');
                       setMostrarModalBloqueo(true);
                     }}
-                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-2xl transition cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-zinc-950/60 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 hover:border-zinc-700 font-bold text-xs rounded-2xl transition cursor-pointer shadow-inner"
                   >
-                    <Ban className="w-3.5 h-3.5" /> Bloquear Complejo
+                    <Shield className="w-3.5 h-3.5 text-emerald-400" /> Gestionar Complejo
                   </button>
 
                   <button
@@ -1112,23 +1396,29 @@ Acabo de reservar un turno por la web:
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                {/* Selector de fecha unificado con el día formateado */}
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 relative">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Fecha de planilla:
                   </label>
 
                   <div className="relative">
-                    <input
-                      type="date"
-                      value={fecha}
-                      onChange={(e) => setFecha(e.target.value)}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                    />
-                    <div className="bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 rounded-2xl px-4 py-2 text-emerald-400 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setMostrarCalendario(!mostrarCalendario)}
+                      className="bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 rounded-2xl px-4 py-2 text-emerald-400 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-inner"
+                    >
                       <Calendar className="w-4 h-4 text-emerald-400" />
                       <span>{formatearFechaConDia(fecha)}</span>
-                    </div>
+                    </button>
+
+                    {mostrarCalendario && (
+                      <CalendarioPicker
+                        fechaSeleccionada={fecha}
+                        hoyISO={hoyISO}
+                        onSeleccionar={setFecha}
+                        onCerrar={() => setMostrarCalendario(false)}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1288,7 +1578,6 @@ Acabo de reservar un turno por la web:
             </div>
           </main>
         ) : (
-          /* VISTA CLIENTE */
           <main className="space-y-4 sm:space-y-6">
             {mensaje && (
               <div className={`p-4 sm:p-5 rounded-3xl border shadow-2xl flex items-center justify-between gap-3 animate-fade-in ${mensaje.tipo === 'exito'
@@ -1312,7 +1601,6 @@ Acabo de reservar un turno por la web:
               </div>
             )}
 
-            {/* Selector de Días Semanales (8 Días) */}
             <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-400" /> 1. Elegí el día de tu partido
@@ -1345,7 +1633,6 @@ Acabo de reservar un turno por la web:
               </div>
             </section>
 
-            {/* Selector Canchas */}
             <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
               <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">2. Seleccioná la cancha</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
@@ -1370,7 +1657,6 @@ Acabo de reservar un turno por la web:
               </div>
             </section>
 
-            {/* Horarios */}
             <section className="bg-zinc-900/95 border border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-3.5 shadow-xl">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-2 text-white">
@@ -1401,7 +1687,6 @@ Acabo de reservar un turno por la web:
               </div>
             </section>
 
-            {/* Formulario de Confirmación */}
             {slotSeleccionado && (
               <form
                 ref={formRef}
@@ -1417,7 +1702,6 @@ Acabo de reservar un turno por la web:
                   </div>
                 </div>
 
-                {/* 💳 DATOS DEL ALIAS Y MONTO EXACTO */}
                 <div className="bg-zinc-950/80 border border-emerald-500/30 rounded-2xl p-4 space-y-3">
                   <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Shield className="w-4 h-4" /> Datos de pago por transferencia
@@ -1475,7 +1759,6 @@ Acabo de reservar un turno por la web:
                   </div>
                 </div>
 
-                {/* 🧾 ADJUNTAR CAPTURA DE COMPROBANTE */}
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
                     Adjuntar Captura del Comprobante (Mercado Pago / Cuenta DNI) *
