@@ -1507,7 +1507,7 @@ Acabo de reservar un turno por la web:
                         const esBloqueado = reserva.estado === 'BLOQUEADO';
                         const esCancelado = reserva.estado === 'CANCELADO';
                         const esFijo = reserva.nombreCliente?.includes('(Fijo)');
-
+                      
                         return (
                           <div
                             key={reserva.id}
@@ -1524,7 +1524,7 @@ Acabo de reservar un turno por la web:
                                   <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                                   {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
                                 </span>
-
+                      
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${esBloqueado
                                   ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                                   : reserva.estado === 'CONFIRMADO'
@@ -1534,7 +1534,7 @@ Acabo de reservar un turno por la web:
                                   {reserva.estado}
                                 </span>
                               </div>
-
+                      
                               {reserva.estado !== 'CANCELADO' && (
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <button
@@ -1544,7 +1544,7 @@ Acabo de reservar un turno por la web:
                                   >
                                     {esBloqueado ? 'Desbloquear' : 'Cancelar'}
                                   </button>
-
+                      
                                   {esFijo && (
                                     <button
                                       onClick={() => handleCancelarCadena(reserva.id)}
@@ -1557,19 +1557,30 @@ Acabo de reservar un turno por la web:
                                 </div>
                               )}
                             </div>
-
+                      
                             <div className="text-xs flex items-center justify-between gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2 flex-wrap">
                               <div className="flex items-center gap-1.5 truncate">
                                 <span className="font-semibold truncate">
                                   {reserva.nombreCliente || 'Sin nombre'}
                                 </span>
-                                {reserva.telefonoCliente && (
+                                {reserva.telefonoCliente && reserva.telefonoCliente !== 'ADMIN' && (
+                                  <a
+                                    href={`https://wa.me/${reserva.telefonoCliente.replace(/\D/g, '').startsWith('54') ? reserva.telefonoCliente.replace(/\D/g, '') : '549' + reserva.telefonoCliente.replace(/\D/g, '').replace(/^0/, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Abrir WhatsApp con el cliente"
+                                    className="text-emerald-400 hover:text-emerald-300 font-bold text-[11px] inline-flex items-center gap-1 transition cursor-pointer ml-1"
+                                  >
+                                    • 📱 {reserva.telefonoCliente}
+                                  </a>
+                                )}
+                                {(!reserva.telefonoCliente || reserva.telefonoCliente === 'ADMIN') && (
                                   <span className="text-zinc-500 text-[11px] truncate">
                                     • {reserva.telefonoCliente}
                                   </span>
                                 )}
                               </div>
-
+                      
                               {reserva.comprobanteImagen && (
                                 <button
                                   onClick={() => {
