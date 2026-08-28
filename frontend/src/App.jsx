@@ -392,7 +392,16 @@ export default function App() {
   useEffect(() => {
     if (mostrarModalBloqueo && bloqueoFecha) {
       const canchaIdParaConsultar = (bloqueoCanchaId && bloqueoCanchaId !== '0') ? bloqueoCanchaId : (canchas[0]?.id || 1);
-      axios.get(`${API_BASE}/reservas/disponibilidad?canchaId=${canchaIdParaConsultar}&fecha=${bloqueoFecha}`)
+      
+      // 👇 NUEVO: Buscamos si hay horario especial para la fecha de bloqueo
+      const horarioDia = horariosEspeciales[bloqueoFecha];
+      let url = `${API_BASE}/reservas/disponibilidad?canchaId=${canchaIdParaConsultar}&fecha=${bloqueoFecha}`;
+      
+      if (horarioDia) {
+        url += `&apertura=${horarioDia.apertura}&cierre=${horarioDia.cierre}`;
+      }
+
+      axios.get(url)
         .then(res => {
           const data = Array.isArray(res.data) ? res.data : [];
           setBloqueoSlots(data);
@@ -402,7 +411,7 @@ export default function App() {
         })
         .catch(() => setBloqueoSlots([]));
     }
-  }, [mostrarModalBloqueo, bloqueoFecha, bloqueoCanchaId, canchas]);
+  }, [mostrarModalBloqueo, bloqueoFecha, bloqueoCanchaId, canchas, horariosEspeciales]);
 
   const cargarReservasAdmin = useCallback(() => {
     if (!club?.id || !fecha) return;
@@ -669,6 +678,9 @@ Acabo de reservar un turno por la web:
     const horaParam = esDiaCompleto ? null : (bloqueoHoraInicio.length === 5 ? `${bloqueoHoraInicio}:00` : bloqueoHoraInicio);
     const canchaParam = (!bloqueoCanchaId || bloqueoCanchaId === '0') ? null : Number(bloqueoCanchaId);
 
+    // Obtenemos el horario especial configurado para esta fecha exacta (si existe)
+    const horarioEspecialDelDia = horariosEspeciales[bloqueoFecha];
+
     try {
       await axios.post(`${API_BASE}/reservas/bloqueos`, {
         canchaId: canchaParam,
@@ -676,7 +688,9 @@ Acabo de reservar un turno por la web:
         fecha: bloqueoFecha,
         horaInicio: horaParam,
         hastaElCierre: esHastaElCierre,
-        motivo: bloqueoMotivo
+        motivo: bloqueoMotivo,
+        apertura: horarioEspecialDelDia ? horarioEspecialDelDia.apertura : null,
+        cierre: horarioEspecialDelDia ? horarioEspecialDelDia.cierre : null
       });
 
       setMostrarModalBloqueo(false);
