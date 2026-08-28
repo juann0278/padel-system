@@ -26,9 +26,11 @@ public class ReservaController {
     @GetMapping("/disponibilidad")
     public ResponseEntity<List<SlotHorarioDTO>> obtenerDisponibilidad(
             @RequestParam Long canchaId,
-            @RequestParam String fecha
+            @RequestParam String fecha,
+            @RequestParam(required = false) String apertura,
+            @RequestParam(required = false) String cierre
     ) {
-        return ResponseEntity.ok(reservaService.obtenerDisponibilidad(canchaId, LocalDate.parse(fecha)));
+        return ResponseEntity.ok(reservaService.obtenerDisponibilidad(canchaId, LocalDate.parse(fecha), apertura, cierre));
     }
 
     @PostMapping

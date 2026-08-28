@@ -29,48 +29,90 @@ public class ReservaService {
     private final ReservaRepository reservaRepository;
     private final CanchaRepository canchaRepository;
 
-    public List<SlotHorarioDTO> obtenerDisponibilidad(Long canchaId, LocalDate fecha) {
-        // Traemos las reservas (excluyendo canceladas)
+    public List<SlotHorarioDTO> obtenerDisponibilidad(Long canchaId, LocalDate fecha, String aperturaStr, String cierreStr) {
         List<Reserva> reservas = reservaRepository.findByCanchaIdAndFechaAndEstadoNot(canchaId, fecha, EstadoReserva.CANCELADO);
 
         LocalDate hoy = LocalDate.now();
         LocalTime ahora = LocalTime.now();
-        LocalDateTime ahoraTiempo = LocalDateTime.now(); // <--- Necesario para comparar con el expiraAt
+        LocalDateTime ahoraTiempo = LocalDateTime.now();
         boolean esHoy = fecha.equals(hoy);
 
-        List<LocalTime> horarios = List.of(
-                LocalTime.of(8, 0), LocalTime.of(9, 30), LocalTime.of(11, 0),
-                LocalTime.of(12, 30), LocalTime.of(14, 0), LocalTime.of(15, 30),
-                LocalTime.of(17, 0), LocalTime.of(18, 30), LocalTime.of(20, 0),
-                LocalTime.of(21, 30), LocalTime.of(23, 0)
-        );
+        java.time.DayOfWeek diaSemana = fecha.getDayOfWeek();
+        List<LocalTime> horarios = new ArrayList<>();
+
+        // Si el admin configuró un horario especial desde el gestor, generamos los bloques matemáticamente
+        if (aperturaStr != null && !aperturaStr.isEmpty() && cierreStr != null && !cierreStr.isEmpty()) {
+            LocalTime aperturaCustom = LocalTime.parse(aperturaStr.length() == 5 ? aperturaStr + ":00" : aperturaStr);
+            LocalTime cierreCustom = LocalTime.parse(cierreStr.length() == 5 ? cierreStr + ":00" : cierreStr);
+
+            // Si el cierre es 00:00, lo tratamos como fin de día para evitar bucles infinitos
+            if (cierreCustom.equals(LocalTime.of(0, 0))) {
+                cierreCustom = LocalTime.of(23, 59);
+            }
+
+            LocalTime cursor = aperturaCustom;
+            int seguridad = 0; // Candado de seguridad anti-bucle de memoria
+
+            while (cursor.plusMinutes(90).compareTo(cierreCustom) <= 0 && seguridad < 20) {
+                horarios.add(cursor);
+                LocalTime siguiente = cursor.plusMinutes(90);
+
+                // Protección extra: si el siguiente horario es menor o igual al actual, o ya cruzó el cierre, frenamos
+                if (siguiente.equals(cierreCustom) || siguiente.isBefore(cursor) || siguiente.compareTo(cierreCustom) > 0) {
+                    break;
+                }
+
+                cursor = siguiente;
+                seguridad++;
+            }
+        } else {
+            // Si no hay horario especial, usamos tus listas fijas originales de siempre
+            if (diaSemana == java.time.DayOfWeek.SUNDAY) {
+                horarios.addAll(List.of(
+                        LocalTime.of(15, 0), LocalTime.of(16, 30),
+                        LocalTime.of(18, 0), LocalTime.of(19, 30)
+                ));
+            } else if (diaSemana == java.time.DayOfWeek.SATURDAY) {
+                horarios.addAll(List.of(
+                        LocalTime.of(13, 30), LocalTime.of(15, 0), LocalTime.of(16, 30),
+                        LocalTime.of(18, 0), LocalTime.of(19, 30), LocalTime.of(21, 0)
+                ));
+            } else {
+                horarios.addAll(List.of(
+                        LocalTime.of(13, 30), LocalTime.of(15, 0), LocalTime.of(16, 30),
+                        LocalTime.of(18, 0), LocalTime.of(19, 30), LocalTime.of(21, 0),
+                        LocalTime.of(22, 30)
+                ));
+            }
+        }
+
+        horarios.sort(LocalTime::compareTo);
 
         List<SlotHorarioDTO> slots = new ArrayList<>();
         for (LocalTime h : horarios) {
-            LocalTime fin = h.equals(LocalTime.of(23, 0)) ? LocalTime.of(23, 59, 59) : h.plusMinutes(90);
+            LocalTime fin = h.plusMinutes(90);
 
-            // 1. Verificamos si ya está ocupado por otra reserva, bloqueo fijo, o un temporal vigente (< 3 min)
             boolean ocupado = reservas.stream().anyMatch(r -> {
-                // Está ocupado de forma firme si es Confirmado, Bloqueado o Fijo
                 boolean ocupadoFirme = r.getEstado() == EstadoReserva.CONFIRMADO ||
                         r.getEstado() == EstadoReserva.BLOQUEADO ||
                         r.getEstado() == EstadoReserva.FIJO;
 
-                // O está ocupado temporalmente si es PENDIENTE_TEMPORAL y aún no se venció el expiraAt
                 boolean temporalVigente = r.getEstado() == EstadoReserva.PENDIENTE_TEMPORAL &&
                         r.getExpiraAt() != null &&
                         r.getExpiraAt().isAfter(ahoraTiempo);
 
-                // Verificamos si se cruza con el horario del slot
-                boolean seSolapaHorario = r.getHoraInicio().equals(h) ||
-                        (!h.equals(LocalTime.of(23, 0)) && h.isBefore(r.getHoraFin()) && fin.isAfter(r.getHoraInicio()));
+                String inicioReservaStr = r.getHoraInicio().toString().substring(0, 5);
+                String finReservaStr = r.getHoraFin().toString().substring(0, 5);
+                String hStr = h.toString().substring(0, 5);
+                String finStr = fin.toString().substring(0, 5);
+
+                boolean seSolapaHorario = inicioReservaStr.equals(hStr) ||
+                        (hStr.compareTo(finReservaStr) < 0 && finStr.compareTo(inicioReservaStr) > 0);
 
                 return (ocupadoFirme || temporalVigente) && seSolapaHorario;
             });
 
-            // 2. Si la consulta es para el día de hoy y el horario ya pasó, se inhabilita
             boolean yaPaso = esHoy && h.isBefore(ahora);
-
             boolean disponible = !ocupado && !yaPaso;
 
             slots.add(new SlotHorarioDTO(h, fin, disponible));
@@ -229,15 +271,28 @@ public class ReservaService {
         String motivo = (dto.getMotivo() != null && !dto.getMotivo().isBlank())
                 ? dto.getMotivo() : "Mantenimiento / Bloqueado";
 
-        List<LocalTime> todosLosHorarios = List.of(
-                LocalTime.of(8, 0), LocalTime.of(9, 30), LocalTime.of(11, 0),
-                LocalTime.of(12, 30), LocalTime.of(14, 0), LocalTime.of(15, 30),
-                LocalTime.of(17, 0), LocalTime.of(18, 30), LocalTime.of(20, 0),
-                LocalTime.of(21, 30), LocalTime.of(23, 0)
-        );
+        java.time.DayOfWeek diaSemana = dto.getFecha().getDayOfWeek();
+        List<LocalTime> todosLosHorarios;
+
+        if (diaSemana == java.time.DayOfWeek.SUNDAY) {
+            todosLosHorarios = List.of(
+                    LocalTime.of(15, 0), LocalTime.of(16, 30),
+                    LocalTime.of(18, 0), LocalTime.of(19, 30)
+            );
+        } else if (diaSemana == java.time.DayOfWeek.SATURDAY) {
+            todosLosHorarios = List.of(
+                    LocalTime.of(13, 30), LocalTime.of(15, 0), LocalTime.of(16, 30),
+                    LocalTime.of(18, 0), LocalTime.of(19, 30), LocalTime.of(21, 0)
+            );
+        } else {
+            todosLosHorarios = List.of(
+                    LocalTime.of(13, 30), LocalTime.of(15, 0), LocalTime.of(16, 30),
+                    LocalTime.of(18, 0), LocalTime.of(19, 30), LocalTime.of(21, 0),
+                    LocalTime.of(22, 30)
+            );
+        }
 
         List<LocalTime> horariosABloquear = new ArrayList<>();
-
         boolean esHoy = dto.getFecha().equals(LocalDate.now());
         LocalTime ahora = LocalTime.now();
 
@@ -278,9 +333,12 @@ public class ReservaService {
 
         for (Cancha cancha : canchasABloquear) {
             for (LocalTime hora : horariosABloquear) {
-                LocalTime horaFin = hora.equals(LocalTime.of(23, 0))
-                        ? LocalTime.of(23, 59, 59)
-                        : hora.plusMinutes(90);
+                LocalTime horaFin = hora.plusMinutes(90);
+
+                // Blindaje anti-error: si por alguna razón la hora de fin queda antes que la de inicio, las corregimos
+                if (horaFin.isBefore(hora)) {
+                    horaFin = hora.plusMinutes(90);
+                }
 
                 Optional<Reserva> reservaExistenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
                         cancha.getId(), dto.getFecha(), hora
@@ -292,6 +350,7 @@ public class ReservaService {
                         r.setEstado(EstadoReserva.BLOQUEADO);
                         r.setNombreCliente("⛔ " + motivo);
                         r.setTelefonoCliente("ADMIN");
+                        r.setHoraInicio(hora);
                         r.setHoraFin(horaFin);
                         reservaRepository.save(r);
                     }
@@ -311,7 +370,6 @@ public class ReservaService {
             }
         }
     }
-
     @Autowired
     private FileStorageService fileStorageService;
 
