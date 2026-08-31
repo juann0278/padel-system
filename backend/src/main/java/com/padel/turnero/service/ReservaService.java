@@ -286,7 +286,10 @@ public class ReservaService {
             LocalTime cursor = aperturaCustom;
             int seguridad = 0;
             while (cursor.plusMinutes(90).compareTo(cierreCustom) <= 0 && seguridad < 20) {
-                todosLosHorarios.add(cursor);
+                // Validamos que no intente agregar 00:00 o valores inválidos
+                if (!cursor.equals(LocalTime.of(0, 0))) {
+                    todosLosHorarios.add(cursor);
+                }
                 LocalTime siguiente = cursor.plusMinutes(90);
                 if (siguiente.equals(cierreCustom) || siguiente.isBefore(cursor) || siguiente.compareTo(cierreCustom) > 0) {
                     break;
@@ -314,7 +317,10 @@ public class ReservaService {
             int seguridad = 0;
 
             while (cursor.plusMinutes(90).compareTo(limiteCierre) <= 0 && seguridad < 20) {
-                todosLosHorarios.add(cursor);
+                // Validamos que no intente agregar 00:00 o valores inválidos
+                if (!cursor.equals(LocalTime.of(0, 0))) {
+                    todosLosHorarios.add(cursor);
+                }
                 LocalTime siguiente = cursor.plusMinutes(90);
                 if (siguiente.equals(limiteCierre) || siguiente.isBefore(cursor) || siguiente.compareTo(limiteCierre) > 0) {
                     break;
