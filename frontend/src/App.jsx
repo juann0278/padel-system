@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import axios from 'axios';
 import {
   Clock,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react';
 
 import FONDO from './assets/FONDO.jpg.avif';
+import FONDO_MURCIELAGO from './assets/imagenFondoFlyer.jpeg';
 
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 const API_BASE = rawApiUrl.endsWith('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`;
@@ -234,6 +236,10 @@ export default function App() {
 
   const [imagenModalUrl, setImagenModalUrl] = useState(null);
 
+  const [mostrarModalFlyer, setMostrarModalFlyer] = useState(false);
+  const [slotsDisponiblesParaFlyer, setSlotsDisponiblesParaFlyer] = useState([]);
+  const flyerRef = useRef(null);
+
   const [mostrarModalCrearAdmin, setMostrarModalCrearAdmin] = useState(false);
   const [adminCanchaId, setAdminCanchaId] = useState('');
   const [adminFecha, setAdminFecha] = useState(hoyISO);
@@ -270,6 +276,7 @@ export default function App() {
   const [horariosEspeciales, setHorariosEspeciales] = useState({});
   const formRef = useRef(null);
   const horariosEspecialesRef = useRef(horariosEspeciales);
+
   useEffect(() => {
     horariosEspecialesRef.current = horariosEspeciales;
   }, [horariosEspeciales]);
@@ -371,7 +378,7 @@ export default function App() {
     if (mostrarModalCrearAdmin && adminCanchaId && adminFecha) {
       const horarioDia = horariosEspeciales[adminFecha];
       let url = `${API_BASE}/reservas/disponibilidad?canchaId=${adminCanchaId}&fecha=${adminFecha}`;
-      
+
       if (horarioDia) {
         url += `&apertura=${horarioDia.apertura}&cierre=${horarioDia.cierre}`;
       }
@@ -392,11 +399,9 @@ export default function App() {
   useEffect(() => {
     if (mostrarModalBloqueo && bloqueoFecha) {
       const canchaIdParaConsultar = (bloqueoCanchaId && bloqueoCanchaId !== '0') ? bloqueoCanchaId : (canchas[0]?.id || 1);
-      
-      // 👇 NUEVO: Buscamos si hay horario especial para la fecha de bloqueo
       const horarioDia = horariosEspeciales[bloqueoFecha];
       let url = `${API_BASE}/reservas/disponibilidad?canchaId=${canchaIdParaConsultar}&fecha=${bloqueoFecha}`;
-      
+
       if (horarioDia) {
         url += `&apertura=${horarioDia.apertura}&cierre=${horarioDia.cierre}`;
       }
@@ -438,6 +443,74 @@ export default function App() {
       return () => clearInterval(intervalId);
     }
   }, [vistaAdmin, estaAutenticado, fecha, club?.id, cargarReservasAdmin]);
+
+  const handleAbrirFlyer = async () => {
+    try {
+      const horarioDia = horariosEspeciales[fecha];
+      const promesasCanchas = canchas.map(async (cancha) => {
+        let url = `${API_BASE}/reservas/disponibilidad?canchaId=${cancha.id}&fecha=${fecha}`;
+        if (horarioDia) {
+          url += `&apertura=${horarioDia.apertura}&cierre=${horarioDia.cierre}`;
+        }
+        const res = await axios.get(url);
+        const data = Array.isArray(res.data) ? res.data : [];
+        const libres = data.filter(s => s.disponible);
+        return {
+          ...cancha,
+          slotsLibres: libres
+        };
+      });
+
+      const resultadoCanchas = await Promise.all(promesasCanchas);
+      setSlotsDisponiblesParaFlyer(resultadoCanchas);
+      setMostrarModalFlyer(true);
+    } catch (err) {
+      console.error("Error al cargar disponibilidad para el flyer", err);
+      alert("No se pudieron cargar los turnos disponibles.");
+    }
+  };
+
+  const handleDescargarFlyerImagen = async () => {
+    if (!flyerRef.current) return;
+    try {
+      await document.fonts.ready;
+      const canvas = await html2canvas(flyerRef.current, {
+        scale: 3, // Calidad máxima hiper nítida para Instagram
+        useCORS: true,
+        backgroundColor: null
+      });
+
+      const image = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = image;
+      link.download = `turnos-disponibles-${fecha}.png`;
+      link.click();
+    } catch (err) {
+      console.error("Error al generar la imagen", err);
+      alert("Error al descargar la imagen.");
+    }
+  };
+
+  const handleCopiarTextoFlyer = () => {
+    let texto = `¡Quedaron estos turnos libres en ${club?.nombre || 'el complejo'} para hoy ${formatearFechaConDia(fecha)}! 🎾🔥\n\n`;
+
+    slotsDisponiblesParaFlyer.forEach(c => {
+      texto += `📌 *${c.nombre}*:\n`;
+      if (c.slotsLibres.length === 0) {
+        texto += `   Sin turnos libres\n`;
+      } else {
+        c.slotsLibres.forEach(s => {
+          texto += `   • ${s.horaInicio?.slice(0, 5)} hs\n`;
+        });
+      }
+      texto += `\n`;
+    });
+
+    texto += `👉 ¡Reservá tu cancha directo en nuestra web!\n(Link en bio 🔗)`;
+
+    navigator.clipboard.writeText(texto);
+    alert("¡Texto copiado al portapapeles con detalle por cancha!");
+  };
 
   const handleSeleccionarSlot = async (slot) => {
     if (!slot.disponible) return;
@@ -678,7 +751,6 @@ Acabo de reservar un turno por la web:
     const horaParam = esDiaCompleto ? null : (bloqueoHoraInicio.length === 5 ? `${bloqueoHoraInicio}:00` : bloqueoHoraInicio);
     const canchaParam = (!bloqueoCanchaId || bloqueoCanchaId === '0') ? null : Number(bloqueoCanchaId);
 
-    // Obtenemos el horario especial configurado para esta fecha exacta (si existe)
     const horarioEspecialDelDia = horariosEspeciales[bloqueoFecha];
 
     try {
@@ -826,6 +898,158 @@ Acabo de reservar un turno por la web:
               >
                 Cerrar
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL FLYER INSTAGRAM TAMAÑO REAL Y ADAPTATIVO */}
+        {mostrarModalFlyer && (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-zinc-900 border border-zinc-700 p-4 sm:p-5 rounded-3xl max-w-md w-full space-y-3 shadow-2xl text-center">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  📢 Flyer para Historias
+                </h3>
+                <button
+                  onClick={() => setMostrarModalFlyer(false)}
+                  className="p-1 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* VISTA PREVIA VISIBLE (IDÉNTICA AL FLYER FINAL QUE SE DESCARGA) */}
+              <div className="w-full flex justify-center overflow-hidden py-1">
+                <div style={{ transform: 'scale(0.82)', transformOrigin: 'top center', marginBottom: '-55px' }}>
+                  <div 
+                    className="p-6 rounded-[24px] text-white space-y-4 shadow-2xl text-center w-[400px]"
+                    style={{
+                      backgroundColor: '#070b14',
+                      backgroundImage: `linear-gradient(to bottom, rgba(7, 11, 20, 0.88), rgba(7, 11, 20, 0.95)), url(${FONDO_MURCIELAGO})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    }}
+                  >
+                    <div>
+                      <p className="text-xs tracking-widest text-sky-400 font-black uppercase mb-3">
+                        🦇 TURNOS DISPONIBLES 🦇
+                      </p>
+                      <h2 className="text-2xl font-black mt-1 text-white tracking-tight uppercase" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                        {club?.nombre}
+                      </h2>
+                      <p className="text-[11px] text-sky-400 font-extrabold tracking-[3px] mt-1 mb-3">AYACUCHO</p>
+                      <p className="text-sm text-slate-100 font-bold">📅 {formatearFechaConDia(fecha)}</p>
+                    </div>
+
+                    <div className="space-y-3 text-left">
+                      {slotsDisponiblesParaFlyer.map((cancha) => (
+                        <div key={cancha.id} className="bg-slate-900/85 backdrop-blur-md border border-sky-500/30 rounded-2xl p-3.5 space-y-2 shadow-lg">
+                          <p className="text-xs font-black text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🎾</span> {cancha.nombre}
+                          </p>
+
+                          <div>
+                            {cancha.slotsLibres.length === 0 ? (
+                              <span className="text-[11px] text-slate-500 italic">Completo / Sin turnos libres</span>
+                            ) : (
+                              <p className="text-xs font-extrabold text-sky-200 tracking-wide m-0" style={{ wordSpacing: '4px' }}>
+                                {cancha.slotsLibres.map(slot => `${slot.horaInicio?.slice(0, 5)} hs`).join('   •   ')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-700/80">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">¡No te quedes sin jugar!</p>
+                      <p className="text-[11px] text-sky-400 font-bold">Reservas online • Link en bio 🔗</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CONTENEDOR OCULTO PARA HTML2CANVAS (TAMAÑO REAL 9:16 DE 1080x1920 PARA INSTAGRAM) */}
+              <div style={{ position: 'absolute', left: '-9999px', top: '0', width: '1080px' }}>
+                <div 
+                  ref={flyerRef}
+                  style={{ 
+                    backgroundColor: '#070b14', 
+                    backgroundImage: `linear-gradient(to bottom, rgba(7, 11, 20, 0.88), rgba(7, 11, 20, 0.95)), url(${FONDO_MURCIELAGO})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    color: '#ffffff', 
+                    padding: '120px 70px 100px 70px', 
+                    fontFamily: 'system-ui, -apple-system, sans-serif', 
+                    width: '1080px', 
+                    minHeight: '1920px', // Altura exacta 9:16 para Instagram Stories
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  {/* ENCABEZADO */}
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '24px', fontWeight: '900', color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '3px', margin: '0 0 20px 0' }}>
+                      🦇 TURNOS DISPONIBLES 🦇
+                    </p>
+                    
+                    <h2 style={{ fontSize: '64px', fontWeight: '900', margin: '0 0 10px 0', color: '#ffffff', textTransform: 'uppercase', textShadow: '0 4px 12px rgba(0,0,0,0.9)', letterSpacing: '-1px' }}>
+                      {club?.nombre}
+                    </h2>
+                    
+                    <p style={{ fontSize: '28px', color: '#38bdf8', fontWeight: '800', margin: '0 0 24px 0', letterSpacing: '4px' }}>AYACUCHO</p>
+                    
+                    <p style={{ fontSize: '34px', color: '#ffffff', fontWeight: '900', margin: '0', letterSpacing: '1px' }}>
+                      📅 {formatearFechaConDia(fecha)}
+                    </p>
+                  </div>
+
+                  {/* GRILLA DE CANCHAS CON SUS TARJETAS Y HORARIOS FLUIDOS */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', margin: '40px 0' }}>
+                    {slotsDisponiblesParaFlyer.map((cancha) => (
+                      <div key={cancha.id} style={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', border: '2px solid rgba(56, 189, 248, 0.35)', borderRadius: '32px', padding: '36px' }}>
+                        <p style={{ fontSize: '32px', fontWeight: '900', color: '#38bdf8', textTransform: 'uppercase', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '14px', letterSpacing: '0.5px' }}>
+                          <span>🎾</span> {cancha.nombre}
+                        </p>
+
+                        <div>
+                          {cancha.slotsLibres.length === 0 ? (
+                            <span style={{ fontSize: '26px', color: '#64748b', fontStyle: 'italic' }}>Completo / Sin turnos libres</span>
+                          ) : (
+                            <p style={{ fontSize: '32px', fontWeight: '900', color: '#bae6fd', margin: '0', letterSpacing: '1px', wordSpacing: '14px', lineHeight: '1.6' }}>
+                              {cancha.slotsLibres.map(slot => `${slot.horaInicio?.slice(0, 5)} hs`).join('   •   ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* PIE / CALL TO ACTION */}
+                  <div style={{ borderTop: '2px solid rgba(51, 65, 85, 0.8)', paddingTop: '30px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '24px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 8px 0', letterSpacing: '2px' }}>¡No te quedes sin jugar!</p>
+                    <p style={{ fontSize: '32px', color: '#38bdf8', fontWeight: '900', margin: '0', letterSpacing: '1px' }}>Reservas online • Link en bio 🔗</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ACCIONES */}
+              <div className="space-y-2 pt-1">
+                <button
+                  onClick={handleDescargarFlyerImagen}
+                  className="w-full bg-sky-400 hover:bg-sky-300 text-slate-950 font-black text-xs sm:text-sm py-3.5 rounded-2xl transition shadow-lg shadow-sky-500/20 cursor-pointer"
+                >
+                  📸 Descargar Imagen para Historia
+                </button>
+                <button
+                  onClick={handleCopiarTextoFlyer}
+                  className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs py-3 rounded-2xl transition cursor-pointer"
+                >
+                  📋 Copiar Texto Detallado
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1166,11 +1390,10 @@ Acabo de reservar un turno por la web:
                         return;
                       }
 
-                      // Convertimos las horas a minutos asegurando que 00:00 sea el cierre del día (24:00)
                       const convertirAMinutos = (horaStr, esCierre = false) => {
                         if (!horaStr) return 0;
                         const [h, m] = horaStr.split(':').map(Number);
-                        if (esCierre && h === 0 && m === 0) return 24 * 60; // 00:00 de cierre vale como fin de día
+                        if (esCierre && h === 0 && m === 0) return 24 * 60;
                         return h * 60 + m;
                       };
 
@@ -1365,6 +1588,13 @@ Acabo de reservar un turno por la web:
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                <button
+                    onClick={handleAbrirFlyer}
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-zinc-950/60 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 hover:border-sky-500/60 font-bold text-xs rounded-2xl transition cursor-pointer shadow-inner"
+                  >
+                    📸 Publicar Disponibles
+                  </button>
+
                   <button
                     onClick={async () => {
                       if (confirm('¿Querés borrar todas las reservas de la base de datos de producción?')) {
@@ -1507,7 +1737,7 @@ Acabo de reservar un turno por la web:
                         const esBloqueado = reserva.estado === 'BLOQUEADO';
                         const esCancelado = reserva.estado === 'CANCELADO';
                         const esFijo = reserva.nombreCliente?.includes('(Fijo)');
-                      
+
                         return (
                           <div
                             key={reserva.id}
@@ -1524,7 +1754,7 @@ Acabo de reservar un turno por la web:
                                   <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                                   {reserva.horaInicio?.slice(0, 5)} - {reserva.horaFin?.slice(0, 5)} hs
                                 </span>
-                      
+
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${esBloqueado
                                   ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                                   : reserva.estado === 'CONFIRMADO'
@@ -1534,7 +1764,7 @@ Acabo de reservar un turno por la web:
                                   {reserva.estado}
                                 </span>
                               </div>
-                      
+
                               {reserva.estado !== 'CANCELADO' && (
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <button
@@ -1544,7 +1774,7 @@ Acabo de reservar un turno por la web:
                                   >
                                     {esBloqueado ? 'Desbloquear' : 'Cancelar'}
                                   </button>
-                      
+
                                   {esFijo && (
                                     <button
                                       onClick={() => handleCancelarCadena(reserva.id)}
@@ -1557,7 +1787,7 @@ Acabo de reservar un turno por la web:
                                 </div>
                               )}
                             </div>
-                      
+
                             <div className="text-xs flex items-center justify-between gap-2 text-zinc-300 border-t border-zinc-800/60 pt-2 flex-wrap">
                               <div className="flex items-center gap-1.5 truncate">
                                 <span className="font-semibold truncate">
@@ -1580,7 +1810,7 @@ Acabo de reservar un turno por la web:
                                   </span>
                                 )}
                               </div>
-                      
+
                               {reserva.comprobanteImagen && (
                                 <button
                                   onClick={() => {
