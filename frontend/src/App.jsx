@@ -475,19 +475,42 @@ export default function App() {
     try {
       await document.fonts.ready;
       const canvas = await html2canvas(flyerRef.current, {
-        scale: 3, // Calidad máxima hiper nítida para Instagram
+        scale: 3, // Calidad máxima hiper nítida
         useCORS: true,
         backgroundColor: null
       });
 
       const image = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = image;
-      link.download = `turnos-disponibles-${fecha}.png`;
-      link.click();
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+      if (isIOS && navigator.share) {
+        // En iPhone, usamos la API nativa de compartir para guardar o mandar a Instagram directo
+        canvas.toBlob(async (blob) => {
+          const file = new File([blob], `turnos-disponibles-${fecha}.png`, { type: "image/png" });
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'Turnos Disponibles',
+              text: '¡Mirá los turnos disponibles para hoy!'
+            });
+          } catch (shareErr) {
+            // Si el usuario cancela el menú nativo, abrimos en pestaña nueva como respaldo
+            window.open(image, '_blank');
+          }
+        });
+      } else if (isIOS) {
+        // Respaldo para iOS sin Web Share: abre la imagen limpia en pestaña para mantener presionada y guardar
+        window.open(image, '_blank');
+      } else {
+        // Comportamiento normal para PC y Android
+        const link = document.createElement("a");
+        link.href = image;
+        link.download = `turnos-disponibles-${fecha}.png`;
+        link.click();
+      }
     } catch (err) {
       console.error("Error al generar la imagen", err);
-      alert("Error al descargar la imagen.");
+      alert("Error al generar la imagen.");
     }
   };
 
