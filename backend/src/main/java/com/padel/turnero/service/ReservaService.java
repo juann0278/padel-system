@@ -371,10 +371,13 @@ public class ReservaService {
 
         for (Cancha cancha : canchasABloquear) {
             for (LocalTime hora : horariosABloquear) {
+                // Calculamos el fin sumando 90 minutos
                 LocalTime horaFin = hora.plusMinutes(90);
 
-                if (horaFin.isBefore(hora)) {
-                    horaFin = hora.plusMinutes(90);
+                // Corrección de seguridad: si pasa la medianoche o da menor/igual,
+                // lo ajustamos al límite máximo permitido del día (ej. 23:59 o el cierre)
+                if (horaFin.equals(LocalTime.of(0, 0)) || horaFin.isBefore(hora)) {
+                    horaFin = LocalTime.of(23, 59);
                 }
 
                 Optional<Reserva> reservaExistenteOpt = reservaRepository.findByCanchaIdAndFechaAndHoraInicio(
