@@ -39,10 +39,10 @@ public class DataInitializer implements CommandLineRunner {
 
         // 2. Si todavía no hay canchas cargadas, creamos las 4 oficiales asociadas al club
         if (canchaRepository.count() == 0) {
-            Cancha c1 = Cancha.builder().club(club).nombre("Cancha 1").tipo("Material").precioBase(new BigDecimal("50.00")).build();
-            Cancha c2 = Cancha.builder().club(club).nombre("Cancha 2").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
-            Cancha c3 = Cancha.builder().club(club).nombre("Cancha 3 (Miguel Medei)").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
-            Cancha c4 = Cancha.builder().club(club).nombre("Cancha 4 (Nicolas Arce)").tipo("Blindex").precioBase(new BigDecimal("50.00")).build();
+            Cancha c1 = Cancha.builder().club(club).nombre("Cancha 1").tipo("Material").precioBase(new BigDecimal("40000.00")).build();
+            Cancha c2 = Cancha.builder().club(club).nombre("Cancha 2").tipo("Blindex").precioBase(new BigDecimal("40000.00")).build();
+            Cancha c3 = Cancha.builder().club(club).nombre("Cancha 3 (Miguel Medei)").tipo("Blindex").precioBase(new BigDecimal("40000.00")).build();
+            Cancha c4 = Cancha.builder().club(club).nombre("Cancha 4 (Nicolas Arce)").tipo("Blindex").precioBase(new BigDecimal("40000.00")).build();
 
             canchaRepository.saveAll(List.of(c1, c2, c3, c4));
             System.out.println(">>> [DataInitializer] ¡Canchas oficiales inicializadas correctamente!");
