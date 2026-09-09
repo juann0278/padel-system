@@ -1991,15 +1991,15 @@ Acabo de reservar un turno por la web:
                       <span className="text-sm font-black text-white select-all">juan.45.mp</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-emerald-400 font-bold block">MONTO EXACTO</span>
+                      <span className="text-[10px] text-emerald-400 font-bold block">MONTO</span>
                       <span className="text-base font-black text-emerald-300">
-                        ${canchas.find(c => c.id === canchaSeleccionada)?.precioBase || '50'}
+                        ${canchas.find(c => c.id === canchaSeleccionada)?.precioBase || '40000'}
                       </span>
                     </div>
                   </div>
 
                   <p className="text-xs text-zinc-300">
-                    Realizá la transferencia por el monto exacto indicado arriba al alias provisto.
+                    Realizá la transferencia por el monto indicado arriba al alias provisto.
                   </p>
 
                   <p className="text-[11px] text-amber-400/90 font-medium">
@@ -2039,7 +2039,7 @@ Acabo de reservar un turno por la web:
 
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-                    Adjuntar Captura del Comprobante (Mercado Pago / Cuenta DNI) *
+                    Adjuntar Captura del Comprobante (Mercado Pago / Cuenta DNI / Otro) *
                   </label>
 
                   <div className="relative">
