@@ -1993,7 +1993,7 @@ Acabo de reservar un turno por la web:
                     <div className="text-right">
                       <span className="text-[10px] text-emerald-400 font-bold block">MONTO</span>
                       <span className="text-base font-black text-emerald-300">
-                        ${canchas.find(c => c.id === canchaSeleccionada)?.precioBase || '40000'}
+                        ${canchas.find(c => c.id === canchaSeleccionada)?.precioBase}
                       </span>
                     </div>
                   </div>
