@@ -944,7 +944,7 @@ Acabo de reservar un turno por la web:
               {/* VISTA PREVIA VISIBLE (IDÉNTICA AL FLYER FINAL QUE SE DESCARGA) */}
               <div className="w-full flex justify-center overflow-hidden py-1">
                 <div style={{ transform: 'scale(0.82)', transformOrigin: 'top center', marginBottom: '-55px' }}>
-                  <div 
+                  <div
                     className="p-6 rounded-[24px] text-white space-y-4 shadow-2xl text-center w-[400px]"
                     style={{
                       backgroundColor: '#070b14',
@@ -994,17 +994,17 @@ Acabo de reservar un turno por la web:
 
               {/* CONTENEDOR OCULTO PARA HTML2CANVAS (TAMAÑO REAL 9:16 DE 1080x1920 PARA INSTAGRAM) */}
               <div style={{ position: 'absolute', left: '-9999px', top: '0', width: '1080px' }}>
-                <div 
+                <div
                   ref={flyerRef}
-                  style={{ 
-                    backgroundColor: '#070b14', 
+                  style={{
+                    backgroundColor: '#070b14',
                     backgroundImage: `linear-gradient(to bottom, rgba(7, 11, 20, 0.88), rgba(7, 11, 20, 0.95)), url(${FONDO_MURCIELAGO})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    color: '#ffffff', 
-                    padding: '120px 70px 100px 70px', 
-                    fontFamily: 'system-ui, -apple-system, sans-serif', 
-                    width: '1080px', 
+                    color: '#ffffff',
+                    padding: '120px 70px 100px 70px',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    width: '1080px',
                     minHeight: '1920px', // Altura exacta 9:16 para Instagram Stories
                     boxSizing: 'border-box',
                     display: 'flex',
@@ -1017,13 +1017,13 @@ Acabo de reservar un turno por la web:
                     <p style={{ fontSize: '24px', fontWeight: '900', color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '3px', margin: '0 0 20px 0' }}>
                       🦇 TURNOS DISPONIBLES 🦇
                     </p>
-                    
+
                     <h2 style={{ fontSize: '64px', fontWeight: '900', margin: '0 0 10px 0', color: '#ffffff', textTransform: 'uppercase', textShadow: '0 4px 12px rgba(0,0,0,0.9)', letterSpacing: '-1px' }}>
                       {club?.nombre}
                     </h2>
-                    
+
                     <p style={{ fontSize: '28px', color: '#38bdf8', fontWeight: '800', margin: '0 0 24px 0', letterSpacing: '4px' }}>AYACUCHO</p>
-                    
+
                     <p style={{ fontSize: '34px', color: '#ffffff', fontWeight: '900', margin: '0', letterSpacing: '1px' }}>
                       📅 {formatearFechaConDia(fecha)}
                     </p>
@@ -1611,7 +1611,7 @@ Acabo de reservar un turno por la web:
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                <button
+                  <button
                     onClick={handleAbrirFlyer}
                     className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-zinc-950/60 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 hover:border-sky-500/60 font-bold text-xs rounded-2xl transition cursor-pointer shadow-inner"
                   >
@@ -1837,8 +1837,13 @@ Acabo de reservar un turno por la web:
                               {reserva.comprobanteImagen && (
                                 <button
                                   onClick={() => {
-                                    const baseURLSinApi = API_BASE.replace('/api/v1', '');
-                                    setImagenModalUrl(`${baseURLSinApi}/uploads/${reserva.comprobanteImagen}`);
+                                    // Si la imagen ya es una URL completa de Supabase, la usamos directo.
+                                    // Si por alguna razón quedó un registro viejo solo con el nombre, armamos el respaldo.
+                                    const urlFinal = reserva.comprobanteImagen.startsWith('http')
+                                      ? reserva.comprobanteImagen
+                                      : `${API_BASE.replace('/api/v1', '')}/uploads/${reserva.comprobanteImagen}`;
+
+                                    setImagenModalUrl(urlFinal);
                                   }}
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer ml-auto"
                                 >
